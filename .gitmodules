@@ -1,0 +1,3 @@
+[submodule "wavegan"]
+	path = wavegan
+	url = https://github.com/chrisdonahue/wavegan
