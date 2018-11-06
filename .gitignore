@@ -9,6 +9,11 @@ __pycache__/
 # C extensions
 *.so
 
+# Downloaded files
+infer.meta
+model.ckpt.*
+timit.ckpt.index
+
 # Distribution / packaging
 .Python
 build/
