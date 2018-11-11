@@ -14,6 +14,9 @@ infer.meta
 model.ckpt.*
 timit.ckpt.index
 
+# Ouput files
+sample_audio/
+
 # Distribution / packaging
 .Python
 build/
