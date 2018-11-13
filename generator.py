@@ -1,6 +1,5 @@
 import tensorflow as tf
 import numpy as np
-from IPython.display import Audio
 import librosa
 
 def build_generator():
