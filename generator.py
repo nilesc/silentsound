@@ -16,7 +16,7 @@ if __name__ == '__main__':
 
     sess = tf.InteractiveSession()
     graph = tf.get_default_graph()
-    video_input = tf.placeholder(dtype=float, shape=(None, 1), name='video_input')
+    video_input = tf.placeholder(dtype=float, shape=(None, 10), name='video_input')
     next_layer = tf.layers.dense(inputs=video_input, units=100)
 
     saver = tf.train.import_meta_graph('infer.meta', input_map={'z': next_layer})
@@ -26,7 +26,6 @@ if __name__ == '__main__':
 
     # CHANGE THESE to change number of examples generated/displayed
     ngenerate = 64
-    ndisplay = 64
 
     # Sample latent vectors
     _z = (np.random.rand(ngenerate, 10) * 2.) - 1.
@@ -36,7 +35,8 @@ if __name__ == '__main__':
     G_z = graph.get_tensor_by_name('G_z:0')[:, :, 0]
     G_z_spec = graph.get_tensor_by_name('G_z_spec:0')
 
-    _G_z = sess.run(G_z, {video_input: _z})
+    optimizer = tf.train.GradientDescentOptimizer(0.01).minimize(G_z)
+    _G_z = sess.run([G_z, optimizer], feed_dict={video_input: _z})
 
-    for i in range(ndisplay):
-        librosa.output.write_wav('sample_audio/{}.wav'.format(i), _G_z[i], 16000) 
+    for i in range(ngenerate):
+        librosa.output.write_wav('sample_audio/{}.wav'.format(i), _G_z[0][i], 16000)
