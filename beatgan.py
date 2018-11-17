@@ -34,15 +34,6 @@ import glob
 
 NP_RANDOM_SEED = 2000
 
-# Set Model Hyperparameters
-class BeatGanHyperParameters():
-    def __init__(self, num_channels, batch_size, model_size, D_update_per_G_update):
-        self.c = num_channels
-        self.b = batch_size
-        self.d = model_size
-        self.D_updates_per_G_update = D_update_per_G_update
-        self.WGAN_GP_weight = 10
-
 
 def get_generator(num_dimensions, num_channels):
     model = Sequential()
@@ -124,6 +115,33 @@ class RandomWeightedAverage(_Merge):
     def _merge_function(self, inputs):
         weights = K.random_uniform((64, 1, 1))
         return (weights * inputs[0]) + ((1 - weights) * inputs[1])
+
+def load_beat_data(policy):
+    print("Loading data")
+    X_train = []
+    normalization_factor = 8388608
+    num_versions = 5
+    paths = glob.glob(os.path.normpath(os.getcwd() + '/ULTIMATE_DRUM_LOOPS/*.wav'))
+    for i in range(len(paths)):
+        sound = wavfile24.read(paths[i])
+        if policy == 0:
+            X_train.append(sound)
+        elif policy == 1:
+            wavfile.write('temp.wav', 14700, sound[1][::3])
+            temp = wavfile.read('temp.wav')
+            def get_length(path):
+                if "125" in path:
+                    return 14112
+                elif "124" in path:
+                    return 14226
+                return 0
+            length = get_length(paths[i])
+            for _ in range(num_versions):
+                a = add_white_noise (temp[1][:length])/normalization_factor
+                b = np.zeros((16384 - length, 2))
+                normed = np.concatenate((a,b))
+                X_train.append(normed)
+    return np.array(X_train) if policy == 1 else X_train
 
 def generate_after_training(BATCH_SIZE):
     generator = generator_model()
@@ -243,6 +261,9 @@ def generate_batch(generator, weights_file, batch_size):
         output = generated_audio[i]
         q = np.array(output*re_normalization_factor).astype('int32')
         wavfile24.write('generated_outputs/output' + ("%03d" % i) + '.wav', sample_rate, np.concatenate((q[:assumed_sample_length], q[:assumed_sample_length])), bitrate=24)
+
+def load_video():
+    pass
 
 # train(6100, hp.b) - this was the original training call, 6k epochs
 
