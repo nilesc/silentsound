@@ -46,7 +46,7 @@ class BeatGanHyperParameters():
 
 def get_generator(num_dimensions, num_channels):
     model = Sequential()
-    model.add(Dense(input_dim=100, output_dim=256*num_dimensions))
+    model.add(Dense(input_dim=100, units=256*num_dimensions))
     model.add(Reshape((1, 16, 16*num_dimensions), input_shape = (256*num_dimensions,)))
     model.add(Activation('relu'))
     model.add(Conv2DTranspose(8*num_dimensions, (1,25), strides=(1,4), padding="same", data_format='channels_last'))
@@ -244,36 +244,13 @@ def generate_batch(generator, weights_file, batch_size):
         q = np.array(output*re_normalization_factor).astype('int32')
         wavfile24.write('generated_outputs/output' + ("%03d" % i) + '.wav', sample_rate, np.concatenate((q[:assumed_sample_length], q[:assumed_sample_length])), bitrate=24)
 
-# Based on qualitative analysis 0.10 is a good threshold for two samples being alike. Auditory analysis
-# shows the scores to be relatively well correlated with the similarity of the waveforms.
-def compute_similarity_score(threshold):
-    original_beats = load_beat_data(0)
-    X_train = load_beat_data(1)
-    generated_outputs = glob.glob(os.path.normpath('/home/narainsk/beat_gan/BeatsByGAN/generated_outputs/*.wav'))
-    num_similar = 0
-    normalization_factor = 8388608
-    num_samples_compared = 14112
-    for i in range(len(generated_outputs)):
-        generated_output_file = generated_outputs[i]
-        b = (wavfile24.read(generated_output_file)[1])/normalization_factor
-        for i in range(len(original_beats)):
-            a = X_train[i*5]
-            error = np.sum(np.square(a[:num_samples_compared] - b[:num_samples_compared]))
-            similarity = error/(np.sum(np.square(a[:num_samples_compared])))
-            if similarity <= threshold:
-                num_similar += 1
-                break
-
-    print (str(num_similar) + ' similar out of ' + str(len(generated_outputs)))
-    return (num_similar*1.0)/len(generated_outputs)
-
 # train(6100, hp.b) - this was the original training call, 6k epochs
 
 
 # generator = get_generator()
 # generate_batch(generator, 'weights/generator6000.h5', 40)
 # print (compute_similarity_score(0.10))
-# 
+#
 # # Test Script that lets you manually check similarity of a generated output vs the training set
 # original_beats = load_beat_data(0)
 # X_train = load_beat_data(1)
@@ -295,32 +272,6 @@ def compute_similarity_score(threshold):
 #         wavfile24.write('similarities_test/similar' + str(i) + 'downsampled.wav', 14700, original_beats[i][1][::3] , bitrate=24)
 
 
-# Based on qualitative analysis 0.05 is a good threshold for two samples being alike. Furthermore, audiotory analysis
-# shows the scores to be relatively well correlated with the similarity of the waveforms.
-def compute_similarity_score(threshold):
-    original_beats = load_beat_data(0)
-    X_train = load_beat_data(1)
-    generated_outputs = glob.glob(os.path.normpath('/home/narainsk/beat_gan/BeatsByGAN/generated_outputs/*.wav'))
-    num_similar = 0
-    normalization_factor = 8388608
-    num_samples_compared = 14112
-    for i in range(len(generated_outputs)):
-        generated_output_file = generated_outputs[i]
-        b = (wavfile24.read(generated_output_file)[1])/normalization_factor
-        for i in range(len(original_beats)):
-            a = X_train[i*5]
-            error = np.sum(np.square(a[:num_samples_compared] - b[:num_samples_compared]))
-            similarity = error/(np.sum(np.square(a[:num_samples_compared])))
-            if similarity <= threshold:
-                num_similar += 1
-
-    print (num_similar)
-    print ('out of')
-    print (len(generated_outputs))
-    return (num_similar*1.0)/len(generated_outputs)
-
-# print (compute_similarity_score(0.05))
-
 def load_wavegan_paper_drumhit_data(policy):
     print("Loading data")
     X_train = []
@@ -341,6 +292,6 @@ def load_wavegan_paper_drumhit_data(policy):
     return np.array(X_train) if policy == 1 else X_train
 # X_train = load_wavegan_paper_drumhit_data(1)
 # np.random.shuffle(X_train)
-# 
+#
 # wavfile24.write('a.wav', 44100, X_train[0][1], bitrate=24)
 
