@@ -56,18 +56,18 @@ def download_file(filename, prefix, num_videos=None):
     try:
         os.mkdir('{}_videos'.format(prefix))
     except Exception as e:
-        print('Directory already exists: {}_videos'.format(prefix))
+        print(e)
 
     try:
         os.mkdir('{}_audio'.format(prefix))
     except Exception as e:
-        print('Directory already exists: {}_audio'.format(prefix))
+        print(e)
 
     num_downloaded = 0
 
     with open(filename) as csv_file:
         csv_reader = csv.reader(csv_file, delimiter=',')
-        for i, row in enumerate(csv_reader):
+        for row in csv_reader:
             video_id = row[0]
             start_time = string_to_int(row[1])
             end_time = string_to_int(row[2])

@@ -1,8 +1,4 @@
 import csv
-from pytube import YouTube
-from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
-import multiprocessing as mp
-from math import ceil
 import sys
 import os
 from scipy.io import wavfile
@@ -19,7 +15,7 @@ def extract_info(filename, prefix):
     all_data = []
     with open(filename) as csv_file:
         csv_reader = csv.reader(csv_file, delimiter=',')
-        for i, row in enumerate(csv_reader):
+        for row in csv_reader:
             video_id = row[0]
             face_x = row[3]
             face_y = row[4]
@@ -33,7 +29,6 @@ def extract_info(filename, prefix):
             #data = np.ravel(np.delete(data, 1, 1))
 
             cap = cv2.VideoCapture('{}_videos/{}.mp4'.format(prefix, video_id))
-            num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))*2
 
             if cap.isOpened() == False:
                 print("Error opening video file.")
@@ -44,7 +39,7 @@ def extract_info(filename, prefix):
             # Read until video is completed
             frames = []
             while cap.isOpened():
-                ret, frame = cap.read()
+                _, frame = cap.read()
 
                 frames.append(frame)
 
