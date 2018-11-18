@@ -3,6 +3,8 @@ from pytube import YouTube
 from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
 import multiprocessing as mp
 from math import ceil
+import sys
+import os
 
 import requests
 
@@ -39,8 +41,13 @@ def download_chunk(args):
 def string_to_int(x):
     return int(float(x))
 
-if __name__ == '__main__':
-    with open('avspeech_train.csv') as csv_file:
+def download_file(filename, prefix):
+    try:
+        os.mkdir('{}_videos'.format(prefix))
+    except Exception as e:
+        print('Directory already exists: {}_videos'.format(prefix))
+
+    with open(filename) as csv_file:
         csv_reader = csv.reader(csv_file, delimiter=',')
         for i, row in enumerate(csv_reader):
             video_id = row[0]
@@ -58,7 +65,7 @@ if __name__ == '__main__':
             print(yt.length)
             if int(yt.length) > 500:
                 continue
-    
+
             print(i)
             filtered = yt.streams.filter(res='240p', mime_type='video/3gpp', fps=30, adaptive=False)
 
@@ -70,7 +77,13 @@ if __name__ == '__main__':
             filename_mp4 = '{}.mp4'.format(str(i))
             download_video(url, itag, filename='videos/{}'.format(filename))
 
-            ffmpeg_extract_subclip('videos/{}'.format(filename), 
+            ffmpeg_extract_subclip('videos/{}'.format(filename),
                     start_time,
                     end_time,
-                    targetname='cropped_videos/{}'.format(filename_mp4))
+                    targetname='{}_videos/{}'.format(prefix, filename_mp4))
+
+if __name__ == '__main__':
+    if len(sys.argv) != 3:
+        print('Please provide the name of a file to download from and a prefix to use when storing them')
+        sys.exit()
+    download_file(sys.argv[1], sys.argv[2])
