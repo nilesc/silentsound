@@ -2,9 +2,11 @@ import csv
 from pytube import YouTube
 from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
 import multiprocessing as mp
+import subprocess
 from math import ceil
 import sys
 import os
+import cv2
 
 import requests
 
@@ -41,11 +43,27 @@ def download_chunk(args):
 def string_to_int(x):
     return int(float(x))
 
-def download_file(filename, prefix):
+def extract_audio(prefix, filename):
+    ## View video
+    video_file = '{}_videos/{}.mp4'.format(prefix, filename)
+    audio_file = '{}_audio/{}.wav'.format(prefix, filename)
+
+    cap = cv2.VideoCapture(video_file)
+    num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))*2
+    subprocess.call("ffmpeg -i " + video_file + " -aframes " + str(num_frames) + " " + audio_file, shell=True)
+
+def download_file(filename, prefix, num_videos=None):
     try:
         os.mkdir('{}_videos'.format(prefix))
     except Exception as e:
         print('Directory already exists: {}_videos'.format(prefix))
+
+    try:
+        os.mkdir('{}_audio'.format(prefix))
+    except Exception as e:
+        print('Directory already exists: {}_audio'.format(prefix))
+
+    num_downloaded = 0
 
     with open(filename) as csv_file:
         csv_reader = csv.reader(csv_file, delimiter=',')
@@ -62,28 +80,36 @@ def download_file(filename, prefix):
                 print('Error when trying to fetch video')
                 continue
 
-            print(yt.length)
             if int(yt.length) > 500:
                 continue
 
-            print(i)
             filtered = yt.streams.filter(res='240p', mime_type='video/3gpp', fps=30, adaptive=False)
 
             if not filtered.all():
                 continue
 
+            num_downloaded += 1
+
             itag = filtered.first().itag
-            filename = '{}.3gpp'.format(str(i))
-            filename_mp4 = '{}.mp4'.format(str(i))
+            filename = '{}.3gpp'.format(video_id)
+            filename_mp4 = '{}.mp4'.format(video_id)
             download_video(url, itag, filename='videos/{}'.format(filename))
 
             ffmpeg_extract_subclip('videos/{}'.format(filename),
                     start_time,
                     end_time,
                     targetname='{}_videos/{}'.format(prefix, filename_mp4))
+            
+            extract_audio(prefix, video_id)
+
+            if num_videos and num_downloaded == num_videos:
+                break
+
 
 if __name__ == '__main__':
-    if len(sys.argv) != 3:
-        print('Please provide the name of a file to download from and a prefix to use when storing them')
+    if len(sys.argv) != 4:
+        print('Please provide the name of a file to download from, ' +
+        'a prefix to use when storing them,' +
+        'and, a number of videos to download')
         sys.exit()
-    download_file(sys.argv[1], sys.argv[2])
+    download_file(sys.argv[1], sys.argv[2], num_videos=int(sys.argv[3]))
