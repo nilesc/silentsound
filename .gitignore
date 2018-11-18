@@ -17,6 +17,7 @@ avspeech*
 
 # Ouput files
 sample_audio/
+*.pkl
 
 # Distribution / packaging
 .Python
