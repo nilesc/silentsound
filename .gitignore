@@ -13,6 +13,7 @@ __pycache__/
 infer.meta
 model.ckpt.*
 timit.ckpt.index
+avspeech*
 
 # Ouput files
 sample_audio/
