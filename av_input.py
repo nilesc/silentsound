@@ -4,6 +4,8 @@ import subprocess
 from pytube import YouTube
 from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
 import cv2
+from scipy.io import wavfile
+import numpy as np
 
 # Install ffmpeg with Homebrew
 # brew install ffmpeg
@@ -19,7 +21,7 @@ with open(csvfile_path) as csv_file:
     csv_reader = csv.reader(csv_file, delimiter=',')
 
     for i, row in enumerate(csv_reader):
-    	if i > num_videos:
+    	if i > num_videos-1:
     		break
 
     	print str(i) + ": " + str(row)
@@ -30,8 +32,10 @@ with open(csvfile_path) as csv_file:
     	stream = YouTube(url).streams.first()
     	stream.download(output_path=vid_path, filename=row[0])
 
+    	clip_path = vid_path + "/" + row[0] 
+
     	# Trim clip to relevant segment, appends "-1" to filename
-    	ffmpeg_extract_subclip(vid_path + "/" + row[0] + ".mp4", float(row[1]), float(row[2]), vid_path + "/" + row[0] + "-1.mp4")
+    	ffmpeg_extract_subclip(clip_path + ".mp4", float(row[1]), float(row[2]), clip_path + "-1.mp4")
 
     	## Using youtube-dl and ffmpeg, speed up download process by only downloading relevant clip segment 
     	# print "youtube-dl --get-url " + url
@@ -41,24 +45,32 @@ with open(csvfile_path) as csv_file:
     	# subprocess.call('ffmpeg -ss (start time) -i (direct video link) -t (duration needed) -c:v copy -c:a copy (destination file))
 
     	## View video
-    	cap = cv2.VideoCapture(vid_path + "/" + row[0] + "-1.mp4")
+    	cap = cv2.VideoCapture(clip_path + "-1.mp4")
+    	num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))*2
+    	subprocess.call("ffmpeg -i " + clip_path + "-1.mp4 -aframes " + str(num_frames) + " " + clip_path + "-1.wav", shell=True)
+    	rate, data = wavfile.read(clip_path + "-1.wav") # sample rate is samples/sec
 
-    	# Check if camera opened successfully
-    	if cap.isOpened() == False: 
+    	# 1D array with one audio channel
+    	data = np.ravel(np.delete(data, 1, 1))
+
+    	if cap.isOpened() == False:
     		print("Error opening video file.")
+
+    	i = 0
 
     	# Read until video is completed
     	while cap.isOpened():
     		ret, frame = cap.read()
-    		
     		cv2.imshow('frame',frame)
+    		
+    		audio = data[i : i + len(data)/num_frames]
+    		i += len(data)/num_frames
 
-    		## Use video data ##
-    		## Will research audio processing ##
+    		## Use frame and audio ##
 
     		# Press q on keyboard to exit
     		if cv2.waitKey(1) & 0xFF == ord('q'):
     			break
-
-    	cap.release()
-    	cv2.destroyAllWindows()
+		
+		cap.release()
+		cv2.destroyAllWindows()
