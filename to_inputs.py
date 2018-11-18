@@ -34,8 +34,6 @@ def extract_info(filename, prefix):
                 print("Error opening video file.")
                 continue
 
-            i = 0
-
             # Read until video is completed
             frames = []
             while cap.isOpened():
@@ -46,7 +44,7 @@ def extract_info(filename, prefix):
                 cap.release()
 
             frames_np = np.asarray(frames)
-            all_data.append((data, frames_np, face_x, face_y))
+            all_data.append((data, frames_np, face_x, face_y, rate))
 
     with open('{}_condensed.pkl'.format(prefix), 'wb') as output_file:
         pickle.dump(all_data, output_file, pickle.HIGHEST_PROTOCOL)
