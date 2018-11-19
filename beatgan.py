@@ -11,10 +11,10 @@ from keras.models import Sequential
 from keras.layers import Dense, Input
 from keras.layers import Reshape
 from keras.models import Model
-from keras.layers.merge import _Merge
+from keras.layers.merge import Concatenate, _Merge
 from keras.layers.core import Activation, Lambda
 from keras.layers.normalization import BatchNormalization
-from keras.layers.convolutional import UpSampling2D, Conv1D
+from keras.layers.convolutional import UpSampling2D, Conv1D, Conv3D
 from keras.layers.convolutional import Convolution2D, AveragePooling2D, Conv2DTranspose
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.core import Flatten
@@ -45,44 +45,61 @@ class BeatGanHyperParameters():
 
 
 def get_generator(num_dimensions, num_channels):
-    model = Sequential()
-    model.add(Dense(input_dim=100, units=256*num_dimensions))
-    model.add(Reshape((1, 16, 16*num_dimensions), input_shape = (256*num_dimensions,)))
-    model.add(Activation('relu'))
-    model.add(Conv2DTranspose(8*num_dimensions, (1,25), strides=(1,4), padding="same", data_format='channels_last'))
-    model.add(Activation('relu'))
-    model.add(Conv2DTranspose(4*num_dimensions, (1,25), strides=(1,4), padding="same", data_format='channels_last'))
-    model.add(Activation('relu'))
-    model.add(Conv2DTranspose(2*num_dimensions, (1,25), strides=(1,4), padding="same", data_format='channels_last'))
-    model.add(Activation('relu'))
-    model.add(Conv2DTranspose(num_dimensions, (1,25), strides=(1,4), padding="same", data_format='channels_last'))
-    model.add(Activation('relu'))
-    model.add(Conv2DTranspose(num_channels, (1,25), strides=(1,4), padding="same", data_format='channels_last'))
-    model.add(Activation('tanh'))
-    model.add(Reshape((16384, num_channels), input_shape = (1, 16384, num_channels)))
-    return model
+    model_input = Input(shape=(5, 5, 5, num_channels))
+    # Change input_dim to be the size of our video
+    print(model_input.shape)
+    model = Conv3D(16, 5, strides=1, padding='valid', data_format='channels_last')(model_input)
+    print(model.shape)
+    model = Flatten()(model)
+    print(model.shape)
+    model = Dense(units=256*num_dimensions)(model)
+    print(model.shape)
+    # Add layers here to connect video_size to the 100 units
+    model = Reshape((1, 16, 16*num_dimensions), input_shape = (256*num_dimensions,))(model)
+    model = Activation('relu')(model)
+    model = Conv2DTranspose(8*num_dimensions, (1,25), strides=(1,4), padding="same", data_format='channels_last')(model)
+    model = Activation('relu')(model)
+    model = Conv2DTranspose(4*num_dimensions, (1,25), strides=(1,4), padding="same", data_format='channels_last')(model)
+    model = Activation('relu')(model)
+    model = Conv2DTranspose(2*num_dimensions, (1,25), strides=(1,4), padding="same", data_format='channels_last')(model)
+    model = Activation('relu')(model)
+    model = Conv2DTranspose(num_dimensions, (1,25), strides=(1,4), padding="same", data_format='channels_last')(model)
+    model = Activation('relu')(model)
+    model = Conv2DTranspose(num_channels, (1,25), strides=(1,4), padding="same", data_format='channels_last')(model)
+    model = Activation('tanh')(model)
+    model = Reshape((16384, num_channels), input_shape = (1, 16384, num_channels))(model)
+
+    return Model(inputs=model_input, outputs=(model, model_input))
 
 def get_discriminator(num_dimensions, num_channels):
+    audio_model_input = Input(shape=(16384, num_channels))
 
-    model = Sequential()
-    model.add(Conv1D(num_dimensions, 25, strides=4, padding="same", input_shape=(16384, num_channels)))
-    model.add(LeakyReLU(alpha=0.2))
-    model.add(Conv1D(2*num_dimensions, 25, strides=4, padding="same"))
-    model.add(LeakyReLU(alpha=0.2))
-    model.add(Conv1D(4*num_dimensions, 25, strides=4, padding="same"))
-    model.add(LeakyReLU(alpha=0.2))
-    model.add(Conv1D(8*num_dimensions, 25, strides=4, padding="same"))
-    model.add(LeakyReLU(alpha=0.2))
-    model.add(Conv1D(16*num_dimensions, 25, strides=4, padding="same"))
-    model.add(LeakyReLU(alpha=0.2))
-    model.add(Reshape((256*num_dimensions, ), input_shape = (1, 16, 16*num_dimensions)))
-    model.add(Dense(1))
-    return model
+    audio_model = Conv1D(num_dimensions, 25, strides=4, padding="same", input_shape=(16384, num_channels))(audio_model_input)
+    audio_model = LeakyReLU(alpha=0.2)(audio_model)
+    audio_model = Conv1D(2*num_dimensions, 25, strides=4, padding="same")(audio_model)
+    audio_model = LeakyReLU(alpha=0.2)(audio_model)
+    audio_model = Conv1D(4*num_dimensions, 25, strides=4, padding="same")(audio_model)
+    audio_model = LeakyReLU(alpha=0.2)(audio_model)
+    audio_model = Conv1D(8*num_dimensions, 25, strides=4, padding="same")(audio_model)
+    audio_model = LeakyReLU(alpha=0.2)(audio_model)
+    audio_model = Conv1D(16*num_dimensions, 25, strides=4, padding="same")(audio_model)
+    audio_model = LeakyReLU(alpha=0.2)(audio_model)
+    audio_model = Reshape((256*num_dimensions, ), input_shape = (1, 16, 16*num_dimensions))(audio_model)
+
+    video_model_input = Input(shape=(5, 5, 5, num_channels))
+    video_model = Conv3D(16, 5, strides=1, padding='valid', data_format='channels_last')(video_model_input)
+    video_model = Flatten()(video_model)
+
+    final_model = Concatenate()([audio_model, video_model])
+    final_model = Dense(256)(final_model)
+    final_model = Dense(1)(final_model)
+
+    return Model(inputs=[audio_model_input, video_model_input], outputs=final_model)
 
 def generator_containing_discriminator(generator, discriminator):
-    model = Sequential()
-    model.add(generator)
-    model.add(discriminator)
+    model = Input(shape=(256 * 64,))
+    model = generator(model)
+    model = discriminator(model)
     return model
 
 def wasserstein_loss(y_true, y_pred):
@@ -163,6 +180,7 @@ def make_discriminator_model(X_train, generator, discriminator):
     real_samples = Input(shape=(16384, hp.c))
     generator_input_for_discriminator = Input(shape=(100,))
     generated_samples_for_discriminator = generator(generator_input_for_discriminator)
+    # Add code here to concat the audio output with the video input
     discriminator_output_from_generator = discriminator(generated_samples_for_discriminator)
     discriminator_output_from_real_samples = discriminator(real_samples)
     averaged_samples = RandomWeightedAverage()([real_samples, generated_samples_for_discriminator])
