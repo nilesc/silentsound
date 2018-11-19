@@ -35,7 +35,7 @@ import glob
 NP_RANDOM_SEED = 2000
 
 # Set Model Hyperparameters
-class BeatGanHyperParameters():
+class HyperParameters():
     def __init__(self, num_channels, batch_size, model_size, D_update_per_G_update):
         self.c = num_channels
         self.b = batch_size
@@ -43,46 +43,48 @@ class BeatGanHyperParameters():
         self.D_updates_per_G_update = D_update_per_G_update
         self.WGAN_GP_weight = 10
 
+hp = HyperParameters(10, 20, 5, 100)
 
-def get_generator(num_dimensions, num_channels):
-    model_input = Input(shape=(5, 5, 5, num_channels))
+
+def get_generator():
+    model_input = Input(shape=(5, 5, 5, hp.c))
     # Change input_dim to be the size of our video
     model = Conv3D(16, 5, strides=1, padding='valid', data_format='channels_last')(model_input)
     model = Flatten()(model)
-    model = Dense(units=256*num_dimensions)(model)
+    model = Dense(units=256*hp.d)(model)
     # Add layers here to connect video_size to the 100 units
-    model = Reshape((1, 16, 16*num_dimensions), input_shape = (256*num_dimensions,))(model)
+    model = Reshape((1, 16, 16*hp.d), input_shape = (256*hp.d,))(model)
     model = Activation('relu')(model)
-    model = Conv2DTranspose(8*num_dimensions, (1,25), strides=(1,4), padding="same", data_format='channels_last')(model)
+    model = Conv2DTranspose(8*hp.d, (1,25), strides=(1,4), padding="same", data_format='channels_last')(model)
     model = Activation('relu')(model)
-    model = Conv2DTranspose(4*num_dimensions, (1,25), strides=(1,4), padding="same", data_format='channels_last')(model)
+    model = Conv2DTranspose(4*hp.d, (1,25), strides=(1,4), padding="same", data_format='channels_last')(model)
     model = Activation('relu')(model)
-    model = Conv2DTranspose(2*num_dimensions, (1,25), strides=(1,4), padding="same", data_format='channels_last')(model)
+    model = Conv2DTranspose(2*hp.d, (1,25), strides=(1,4), padding="same", data_format='channels_last')(model)
     model = Activation('relu')(model)
-    model = Conv2DTranspose(num_dimensions, (1,25), strides=(1,4), padding="same", data_format='channels_last')(model)
+    model = Conv2DTranspose(hp.d, (1,25), strides=(1,4), padding="same", data_format='channels_last')(model)
     model = Activation('relu')(model)
-    model = Conv2DTranspose(num_channels, (1,25), strides=(1,4), padding="same", data_format='channels_last')(model)
+    model = Conv2DTranspose(hp.c, (1,25), strides=(1,4), padding="same", data_format='channels_last')(model)
     model = Activation('tanh')(model)
-    model = Reshape((16384, num_channels), input_shape = (1, 16384, num_channels))(model)
+    model = Reshape((16384, hp.c), input_shape = (1, 16384, hp.c))(model)
 
     return Model(inputs=model_input, outputs=(model, model_input))
 
-def get_discriminator(num_dimensions, num_channels):
-    audio_model_input = Input(shape=(16384, num_channels))
+def get_discriminator():
+    audio_model_input = Input(shape=(16384, hp.c))
 
-    audio_model = Conv1D(num_dimensions, 25, strides=4, padding="same", input_shape=(16384, num_channels))(audio_model_input)
+    audio_model = Conv1D(hp.d, 25, strides=4, padding="same", input_shape=(16384, hp.c))(audio_model_input)
     audio_model = LeakyReLU(alpha=0.2)(audio_model)
-    audio_model = Conv1D(2*num_dimensions, 25, strides=4, padding="same")(audio_model)
+    audio_model = Conv1D(2*hp.d, 25, strides=4, padding="same")(audio_model)
     audio_model = LeakyReLU(alpha=0.2)(audio_model)
-    audio_model = Conv1D(4*num_dimensions, 25, strides=4, padding="same")(audio_model)
+    audio_model = Conv1D(4*hp.d, 25, strides=4, padding="same")(audio_model)
     audio_model = LeakyReLU(alpha=0.2)(audio_model)
-    audio_model = Conv1D(8*num_dimensions, 25, strides=4, padding="same")(audio_model)
+    audio_model = Conv1D(8*hp.d, 25, strides=4, padding="same")(audio_model)
     audio_model = LeakyReLU(alpha=0.2)(audio_model)
-    audio_model = Conv1D(16*num_dimensions, 25, strides=4, padding="same")(audio_model)
+    audio_model = Conv1D(16*hp.d, 25, strides=4, padding="same")(audio_model)
     audio_model = LeakyReLU(alpha=0.2)(audio_model)
-    audio_model = Reshape((256*num_dimensions, ), input_shape = (1, 16, 16*num_dimensions))(audio_model)
+    audio_model = Reshape((256*hp.d, ), input_shape = (1, 16, 16*hp.d))(audio_model)
 
-    video_model_input = Input(shape=(5, 5, 5, num_channels))
+    video_model_input = Input(shape=(5, 5, 5, hp.c))
     video_model = Conv3D(16, 5, strides=1, padding='valid', data_format='channels_last')(video_model_input)
     video_model = Flatten()(video_model)
 
@@ -93,7 +95,7 @@ def get_discriminator(num_dimensions, num_channels):
     return Model(inputs=[audio_model_input, video_model_input], outputs=final_model)
 
 def generator_containing_discriminator(generator, discriminator):
-    model = Input(shape=(5, 5, 5, 2))
+    model = Input(shape=(5, 5, 5, hp.c))
     model = generator(model)
     model = discriminator(model)
     return model
@@ -135,28 +137,29 @@ class RandomWeightedAverage(_Merge):
     Improvements appreciated."""
 
     def _merge_function(self, inputs):
-        weights = K.random_uniform((64, 1, 1))
+        shape = inputs[0].get_shape().as_list()
+        weights = K.random_uniform((hp.b, shape[1], shape[2]))
         return (weights * inputs[0]) + ((1 - weights) * inputs[1])
 
-def generate_after_training(BATCH_SIZE):
+def generate_after_training():
     generator = generator_model()
     generator.compile(loss='binary_crossentropy', optimizer="SGD")
     generator.load_weights('goodgenerator.h5')
 
-    noise = np.zeros((BATCH_SIZE, 100))
-    for i in range(BATCH_SIZE):
+    noise = np.zeros((hp.b, 100))
+    for i in range(hp.b):
         noise[i, :] = np.random.uniform(-1, 1, 100)
     generated_audio = generator.predict(noise, verbose=1)
     print(generated_audio.shape)
     for audio in generated_audio:
         wavfile.write('thing.wav', 14700, audio)
 
-def make_generator_model(generator, discriminator, num_channels):
+def make_generator_model(generator, discriminator):
     for layer in discriminator.layers:
         layer.trainable = False
     discriminator.trainable = False
 
-    generator_input = Input(shape=(5, 5, 5, num_channels))
+    generator_input = Input(shape=(5, 5, 5, hp.c))
     generator_layers = generator(generator_input)
     discriminator_layers_for_generator = discriminator(generator_layers)
     generator_model = Model(inputs=[generator_input], outputs=[discriminator_layers_for_generator])
@@ -165,7 +168,7 @@ def make_generator_model(generator, discriminator, num_channels):
     generator_model.compile(optimizer=Adam(0.0001, beta_1=0.5, beta_2=0.9), loss=wasserstein_loss)
     return generator_model
 
-def make_discriminator_model(generator, discriminator, num_channels):
+def make_discriminator_model(generator, discriminator):
     for layer in discriminator.layers:
         layer.trainable = True
     for layer in generator.layers:
@@ -173,8 +176,8 @@ def make_discriminator_model(generator, discriminator, num_channels):
     discriminator.trainable = True
     generator.trainable = False
 
-    real_samples = Input(shape=(16384, num_channels))
-    generator_input_for_discriminator = Input(shape=(5, 5, 5, num_channels))
+    real_samples = Input(shape=(16384, hp.c))
+    generator_input_for_discriminator = Input(shape=(5, 5, 5, hp.c))
     print(generator_input_for_discriminator)
     print(generator_input_for_discriminator.shape)
     generated_samples_for_discriminator = generator(generator_input_for_discriminator)
@@ -206,40 +209,48 @@ def get_noise(shape):
     return np.random.uniform(-1, 1, shape).astype(np.float32)
 
 def load_videos(x):
-    return np.ones((10, 16384, 10)), np.ones((10, 5, 5, 5, 10))
+    return np.ones((1000, 16384, 10)), np.ones((1000, 5, 5, 5, 10))
 
-def train(epochs, BATCH_SIZE):
+def train(epochs):
     np.random.seed(NP_RANDOM_SEED)
     X_train_audio, X_train_video = load_videos(1)
     # np.random.shuffle(X_train_audio)
 
-    num_dimensions = 10
-    num_channels = 10
-    discriminator = get_discriminator(num_dimensions, num_channels)
-    generator = get_generator(num_dimensions, num_channels)
+    discriminator = get_discriminator()
+    generator = get_generator()
 
-    generator_model = make_generator_model(generator, discriminator, num_channels)
-    discriminator_model = make_discriminator_model(generator, discriminator, num_channels)
+    generator_model = make_generator_model(generator, discriminator)
+    generator.summary()
+    discriminator_model = make_discriminator_model(generator, discriminator)
+    discriminator.summary()
 
 
-    positive_y = np.ones((BATCH_SIZE, 1), dtype=np.float32)
+    positive_y = np.ones((hp.b, 1), dtype=np.float32)
     negative_y = -positive_y
-    dummy_y = np.zeros((BATCH_SIZE, 1), dtype=np.float32)
+    dummy_y = np.zeros((hp.b, 1), dtype=np.float32)
 
-    print("Number of batches", int(X_train_audio.shape[0]/BATCH_SIZE))
+    print("Number of batches", int(X_train_audio.shape[0]/hp.b))
     for epoch in range(epochs):
         print("Epoch is", epoch)
         dl, gl = {}, {}
         # np.random.shuffle(X_train)
-        for index in range(int(X_train_audio.shape[0]/BATCH_SIZE)):
-            audio_batch = X_train_audio[index*BATCH_SIZE:(index+1)*BATCH_SIZE].reshape(BATCH_SIZE, 16384, num_channels)
-            video_batch = X_train_video[index*BATCH_SIZE:(index+1)*BATCH_SIZE].reshape(BATCH_SIZE, 5, 5, 5, 10)
+        for index in range(int(X_train_audio.shape[0]/hp.b)):
+            print(X_train_audio[index*hp.b:(index+1)*hp.b].shape)
+            print(X_train_video[index*hp.b:(index+1)*hp.b].shape)
+            print()
+            audio_batch = X_train_audio[index*hp.b:(index+1)*hp.b].reshape(hp.b, 16384, hp.c)
+            video_batch = X_train_video[index*hp.b:(index+1)*hp.b].reshape(hp.b, 5, 5, 5, 10)
             # noise = get_noise((BATCH_SIZE, 100))
+            print(audio_batch.shape)
+            print(video_batch.shape)
+            print(positive_y.shape)
+            print(negative_y.shape)
+            print(dummy_y.shape)
             d_loss = discriminator_model.train_on_batch([audio_batch, video_batch], [positive_y, negative_y, dummy_y])
             dl = d_loss
             if index % hp.D_updates_per_G_update == 0:
                 #print("batch %d d_loss : %s" % (index, d_loss))
-                noise = get_noise((BATCH_SIZE, 100))
+                noise = get_noise((hp.b, 100))
                 g_loss = generator_model.train_on_batch(video_batch, positive_y)
                 gl = g_loss
                 #print("batch %d g_loss : %0.10f" % (index, g_loss))
@@ -257,8 +268,8 @@ def generate_one(generator, epoch, index):
     q = np.array(generated_audio[0]*8388608).astype('int32')
     wavfile24.write('outputs/epoch' + ("%04d" % epoch) + 'index'+ ("%03d" % index) + '.wav', 14700, q, bitrate=24)
 
-def generate_batch(generator, weights_file, batch_size):
-    noise = get_noise((batch_size,100))
+def generate_batch(generator, weights_file):
+    noise = get_noise((hp.b,100))
     generator.load_weights(weights_file)
     generated_audio = generator.predict(noise, verbose=1)
     re_normalization_factor = 8388608
