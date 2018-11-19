@@ -206,11 +206,11 @@ def get_noise(shape):
     return np.random.uniform(-1, 1, shape).astype(np.float32)
 
 def load_videos(x):
-    return np.ones((16384,)), np.ones((10, 5, 5, 5))
+    return np.ones((10, 16384, 10)), np.ones((10, 5, 5, 5, 10))
 
 def train(epochs, BATCH_SIZE):
     np.random.seed(NP_RANDOM_SEED)
-    X_train_audio, X_train_videos = load_videos(1)
+    X_train_audio, X_train_video = load_videos(1)
     # np.random.shuffle(X_train_audio)
 
     num_dimensions = 10
@@ -233,13 +233,14 @@ def train(epochs, BATCH_SIZE):
         # np.random.shuffle(X_train)
         for index in range(int(X_train_audio.shape[0]/BATCH_SIZE)):
             audio_batch = X_train_audio[index*BATCH_SIZE:(index+1)*BATCH_SIZE].reshape(BATCH_SIZE, 16384, num_channels)
-            noise = get_noise((BATCH_SIZE, 100))
-            d_loss = discriminator_model.train_on_batch([audio_batch, noise], [positive_y, negative_y, dummy_y])
+            video_batch = X_train_video[index*BATCH_SIZE:(index+1)*BATCH_SIZE].reshape(BATCH_SIZE, 5, 5, 5, 10)
+            # noise = get_noise((BATCH_SIZE, 100))
+            d_loss = discriminator_model.train_on_batch([audio_batch, video_batch], [positive_y, negative_y, dummy_y])
             dl = d_loss
             if index % hp.D_updates_per_G_update == 0:
                 #print("batch %d d_loss : %s" % (index, d_loss))
                 noise = get_noise((BATCH_SIZE, 100))
-                g_loss = generator_model.train_on_batch(noise, positive_y)
+                g_loss = generator_model.train_on_batch(video_batch, positive_y)
                 gl = g_loss
                 #print("batch %d g_loss : %0.10f" % (index, g_loss))
 
