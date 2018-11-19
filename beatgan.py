@@ -47,13 +47,9 @@ class BeatGanHyperParameters():
 def get_generator(num_dimensions, num_channels):
     model_input = Input(shape=(5, 5, 5, num_channels))
     # Change input_dim to be the size of our video
-    print(model_input.shape)
     model = Conv3D(16, 5, strides=1, padding='valid', data_format='channels_last')(model_input)
-    print(model.shape)
     model = Flatten()(model)
-    print(model.shape)
     model = Dense(units=256*num_dimensions)(model)
-    print(model.shape)
     # Add layers here to connect video_size to the 100 units
     model = Reshape((1, 16, 16*num_dimensions), input_shape = (256*num_dimensions,))(model)
     model = Activation('relu')(model)
@@ -97,7 +93,7 @@ def get_discriminator(num_dimensions, num_channels):
     return Model(inputs=[audio_model_input, video_model_input], outputs=final_model)
 
 def generator_containing_discriminator(generator, discriminator):
-    model = Input(shape=(256 * 64,))
+    model = Input(shape=(5, 5, 5, 2))
     model = generator(model)
     model = discriminator(model)
     return model
