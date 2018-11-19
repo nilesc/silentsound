@@ -151,12 +151,12 @@ def generate_after_training(BATCH_SIZE):
     for audio in generated_audio:
         wavfile.write('thing.wav', 14700, audio)
 
-def make_generator_model(X_train, generator, discriminator):
+def make_generator_model(generator, discriminator, num_channels):
     for layer in discriminator.layers:
         layer.trainable = False
     discriminator.trainable = False
 
-    generator_input = Input(shape=(100,))
+    generator_input = Input(shape=(5, 5, 5, num_channels))
     generator_layers = generator(generator_input)
     discriminator_layers_for_generator = discriminator(generator_layers)
     generator_model = Model(inputs=[generator_input], outputs=[discriminator_layers_for_generator])
@@ -165,7 +165,7 @@ def make_generator_model(X_train, generator, discriminator):
     generator_model.compile(optimizer=Adam(0.0001, beta_1=0.5, beta_2=0.9), loss=wasserstein_loss)
     return generator_model
 
-def make_discriminator_model(X_train, generator, discriminator):
+def make_discriminator_model(generator, discriminator, num_channels):
     for layer in discriminator.layers:
         layer.trainable = True
     for layer in generator.layers:
@@ -173,14 +173,18 @@ def make_discriminator_model(X_train, generator, discriminator):
     discriminator.trainable = True
     generator.trainable = False
 
-    real_samples = Input(shape=(16384, hp.c))
-    generator_input_for_discriminator = Input(shape=(100,))
+    real_samples = Input(shape=(16384, num_channels))
+    generator_input_for_discriminator = Input(shape=(5, 5, 5, num_channels))
+    print(generator_input_for_discriminator)
+    print(generator_input_for_discriminator.shape)
     generated_samples_for_discriminator = generator(generator_input_for_discriminator)
-    # Add code here to concat the audio output with the video input
     discriminator_output_from_generator = discriminator(generated_samples_for_discriminator)
-    discriminator_output_from_real_samples = discriminator(real_samples)
-    averaged_samples = RandomWeightedAverage()([real_samples, generated_samples_for_discriminator])
-    averaged_samples_out = discriminator(averaged_samples)
+    # Need to modify real_samples to include original input
+    discriminator_output_from_real_samples = discriminator([real_samples, generator_input_for_discriminator])
+    averaged_samples = RandomWeightedAverage()([real_samples, generated_samples_for_discriminator[0]])
+    print([real_samples, generated_samples_for_discriminator[0]])
+    print(averaged_samples)
+    averaged_samples_out = discriminator([averaged_samples, generator_input_for_discriminator])
 
     partial_gp_loss = partial(gradient_penalty_loss,
                           averaged_samples=averaged_samples,
@@ -201,28 +205,34 @@ def make_discriminator_model(X_train, generator, discriminator):
 def get_noise(shape):
     return np.random.uniform(-1, 1, shape).astype(np.float32)
 
+def load_videos(x):
+    return np.ones((16384,)), np.ones((10, 5, 5, 5))
+
 def train(epochs, BATCH_SIZE):
     np.random.seed(NP_RANDOM_SEED)
-    X_train = load_beat_data(1)
-    np.random.shuffle(X_train)
+    X_train_audio, X_train_videos = load_videos(1)
+    # np.random.shuffle(X_train_audio)
 
-    discriminator = get_discriminator()
-    generator = get_generator()
+    num_dimensions = 10
+    num_channels = 10
+    discriminator = get_discriminator(num_dimensions, num_channels)
+    generator = get_generator(num_dimensions, num_channels)
 
-    generator_model = make_generator_model(X_train, generator, discriminator)
-    discriminator_model = make_discriminator_model(X_train, generator, discriminator)
+    generator_model = make_generator_model(generator, discriminator, num_channels)
+    discriminator_model = make_discriminator_model(generator, discriminator, num_channels)
+
 
     positive_y = np.ones((BATCH_SIZE, 1), dtype=np.float32)
     negative_y = -positive_y
     dummy_y = np.zeros((BATCH_SIZE, 1), dtype=np.float32)
 
-    print("Number of batches", int(X_train.shape[0]/BATCH_SIZE))
+    print("Number of batches", int(X_train_audio.shape[0]/BATCH_SIZE))
     for epoch in range(epochs):
         print("Epoch is", epoch)
         dl, gl = {}, {}
-        np.random.shuffle(X_train)
-        for index in range(int(X_train.shape[0]/BATCH_SIZE)):
-            audio_batch = X_train[index*BATCH_SIZE:(index+1)*BATCH_SIZE].reshape(BATCH_SIZE, 16384, hp.c)
+        # np.random.shuffle(X_train)
+        for index in range(int(X_train_audio.shape[0]/BATCH_SIZE)):
+            audio_batch = X_train_audio[index*BATCH_SIZE:(index+1)*BATCH_SIZE].reshape(BATCH_SIZE, 16384, num_channels)
             noise = get_noise((BATCH_SIZE, 100))
             d_loss = discriminator_model.train_on_batch([audio_batch, noise], [positive_y, negative_y, dummy_y])
             dl = d_loss
