@@ -48,9 +48,7 @@ def extract_audio(prefix, filename):
     video_file = '{}_videos/{}.mp4'.format(prefix, filename)
     audio_file = '{}_audio/{}.wav'.format(prefix, filename)
 
-    cap = cv2.VideoCapture(video_file)
-    num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))*2
-    subprocess.call("ffmpeg -i " + video_file + " -aframes " + str(num_frames) + " " + audio_file, shell=True)
+    subprocess.call(f'ffmpeg -i {video_file} -ab 160k -ac 2 -ar 44100 -vn {audio_file}', shell=True)
 
 def download_file(filename, prefix, num_videos=None):
     try:
@@ -69,8 +67,8 @@ def download_file(filename, prefix, num_videos=None):
         csv_reader = csv.reader(csv_file, delimiter=',')
         for row in csv_reader:
             video_id = row[0]
-            start_time = string_to_int(row[1])
-            end_time = string_to_int(row[2])
+            end_time = string_to_int(row[1])
+            start_time = end_time - 1
 
             url = 'http://youtube.com/watch?v={}'.format(video_id)
 
@@ -83,7 +81,7 @@ def download_file(filename, prefix, num_videos=None):
             if int(yt.length) > 500:
                 continue
 
-            filtered = yt.streams.filter(res='240p', mime_type='video/3gpp', fps=30, adaptive=False)
+            filtered = yt.streams.filter(res='360p', mime_type='video/mp4', fps=30, progressive=True)
 
             if not filtered.all():
                 continue
@@ -91,16 +89,24 @@ def download_file(filename, prefix, num_videos=None):
             num_downloaded += 1
 
             itag = filtered.first().itag
-            filename = '{}.3gpp'.format(video_id)
+            filename = '{}.mp4'.format(video_id)
             filename_mp4 = '{}.mp4'.format(video_id)
-            download_video(url, itag, filename='videos/{}'.format(filename))
+            original_video_location = f'videos/{filename}'
+            keyframe_video_location = f'videos/key-{filename}'
+            download_video(url, itag, filename=original_video_location)
 
-            ffmpeg_extract_subclip('videos/{}'.format(filename),
+            start_min = start_time//60
+            start_sec = start_time%60
+            subprocess.call(f'ffmpeg -i {original_video_location} -force_key_frames 00:{start_min}:{start_sec} {keyframe_video_location}', shell=True)
+            ffmpeg_extract_subclip(keyframe_video_location,
                     start_time,
                     end_time,
                     targetname='{}_videos/{}'.format(prefix, filename_mp4))
 
             extract_audio(prefix, video_id)
+
+            os.remove(original_video_location)
+            os.remove(keyframe_video_location)
 
             if num_videos and num_downloaded == num_videos:
                 break
