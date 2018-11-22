@@ -43,14 +43,12 @@ def extract_info(filename, prefix):
 
             # Read until video is completed
             frames = []
-            counter = 0
             while True:
                 ret, frame = cap.read()
                 if not ret:
                     break
 
                 frames.append(frame)
-                counter += 1
 
             cap.release()
 

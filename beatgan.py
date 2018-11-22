@@ -37,22 +37,24 @@ NP_RANDOM_SEED = 2000
 train_data = 'test_condensed.pkl'
 test_data = 'test_condensed.pkl'
 audio_length = 16384
-window_radius = 200
 
 # Set Model Hyperparameters
 class HyperParameters():
-    def __init__(self, num_channels, batch_size, model_size, D_update_per_G_update):
+    def __init__(self, num_channels, batch_size, model_size, D_update_per_G_update, window_radius, num_frames):
         self.c = num_channels
         self.b = batch_size
         self.d = model_size
         self.D_updates_per_G_update = D_update_per_G_update
         self.WGAN_GP_weight = 10
+        self.window_radius = window_radius
+        self.num_frames = num_frames
+        self.video_shape = (num_frames, 2*window_radius, 2*window_radius, 3)
 
-hp = HyperParameters(1, 20, 5, 100)
+hp = HyperParameters(1, 20, 5, 100, 50, 10)
 
 
 def get_generator():
-    model_input = Input(shape=(5, 5, 5, hp.c))
+    model_input = Input(shape=hp.video_shape)
     # Change input_dim to be the size of our video
     model = Conv3D(16, 5, strides=1, padding='valid', data_format='channels_last')(model_input)
     model = Flatten()(model)
@@ -89,7 +91,7 @@ def get_discriminator():
     audio_model = LeakyReLU(alpha=0.2)(audio_model)
     audio_model = Reshape((256*hp.d, ), input_shape = (1, 16, 16*hp.d))(audio_model)
 
-    video_model_input = Input(shape=(5, 5, 5, hp.c))
+    video_model_input = Input(shape=(hp.video_shape))
     video_model = Conv3D(16, 5, strides=1, padding='valid', data_format='channels_last')(video_model_input)
     video_model = Flatten()(video_model)
 
@@ -100,7 +102,7 @@ def get_discriminator():
     return Model(inputs=[audio_model_input, video_model_input], outputs=final_model)
 
 def generator_containing_discriminator(generator, discriminator):
-    model = Input(shape=(5, 5, 5, hp.c))
+    model = Input(shape=(hp.video_shape))
     model = generator(model)
     model = discriminator(model)
     return model
@@ -164,7 +166,7 @@ def make_generator_model(generator, discriminator):
         layer.trainable = False
     discriminator.trainable = False
 
-    generator_input = Input(shape=(5, 5, 5, hp.c))
+    generator_input = Input(shape=hp.video_shape)
     generator_layers = generator(generator_input)
     discriminator_layers_for_generator = discriminator(generator_layers)
     generator_model = Model(inputs=[generator_input], outputs=[discriminator_layers_for_generator])
@@ -182,7 +184,7 @@ def make_discriminator_model(generator, discriminator):
     generator.trainable = False
 
     real_samples = Input(shape=(16384, hp.c))
-    generator_input_for_discriminator = Input(shape=(5, 5, 5, hp.c))
+    generator_input_for_discriminator = Input(shape=hp.video_shape)
     generated_samples_for_discriminator = generator(generator_input_for_discriminator)
     discriminator_output_from_generator = discriminator(generated_samples_for_discriminator)
     # Need to modify real_samples to include original input
@@ -262,7 +264,7 @@ def load_videos(filename, window_radius):
 
 def train(epochs):
     np.random.seed(NP_RANDOM_SEED)
-    X_train_audio, X_train_video = load_videos(test_data, window_radius)
+    X_train_audio, X_train_video = load_videos(test_data, hp.window_radius)
     # np.random.shuffle(X_train_audio)
 
     discriminator = get_discriminator()
@@ -284,17 +286,9 @@ def train(epochs):
         dl, gl = {}, {}
         # np.random.shuffle(X_train)
         for index in range(int(X_train_audio.shape[0]/hp.b)):
-            print(X_train_audio[index*hp.b:(index+1)*hp.b].shape)
-            print(X_train_video[index*hp.b:(index+1)*hp.b].shape)
-            print()
             audio_batch = X_train_audio[index*hp.b:(index+1)*hp.b].reshape(hp.b, 16384, hp.c)
-            video_batch = X_train_video[index*hp.b:(index+1)*hp.b].reshape(hp.b, 5, 5, 5, 10)
+            video_batch = X_train_video[index*hp.b:(index+1)*hp.b].reshape((hp.b,) + hp.video_shape)
             # noise = get_noise((BATCH_SIZE, 100))
-            print(audio_batch.shape)
-            print(video_batch.shape)
-            print(positive_y.shape)
-            print(negative_y.shape)
-            print(dummy_y.shape)
             d_loss = discriminator_model.train_on_batch([audio_batch, video_batch], [positive_y, negative_y, dummy_y])
             dl = d_loss
             if index % hp.D_updates_per_G_update == 0:
