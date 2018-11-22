@@ -232,10 +232,16 @@ def crop_videos(video, x, y, crop_window_radius):
 
     video = np.pad(video, ((0, 0), (-x_low, x_high - x_length), (-y_low, y_high - y_length), (0, 0)), mode='edge')
 
-    center_x += x_low
-    center_y += y_low
+    center_x -= x_low
+    center_y -= y_low
 
-    return video[:, center_x-crop_window_radius:center_x+crop_window_radius,
+    cropped = video[:,
+            center_x-crop_window_radius:center_x+crop_window_radius,
+            center_y-crop_window_radius:center_y+crop_window_radius,
+            :]
+
+    return video[:,
+            center_x-crop_window_radius:center_x+crop_window_radius,
             center_y-crop_window_radius:center_y+crop_window_radius,
             :]
 
@@ -247,6 +253,9 @@ def load_videos(filename, window_radius):
         for row in all_info:
             audio.append(pad_or_truncate(row[0], audio_length))
             videos.append(crop_videos(row[1], row[2], row[3], window_radius))
+
+    for video in videos:
+        print(video.shape)
 
     return np.asarray(audio), np.asarray(videos)
     # return np.ones((1000, 16384, 10)), np.ones((1000, 5, 5, 5, 10))
