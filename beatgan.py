@@ -31,8 +31,13 @@ import wavfile24
 import os
 import os.path
 import glob
+import pickle
 
 NP_RANDOM_SEED = 2000
+train_data = 'test_condensed.pkl'
+test_data = 'test_condensed.pkl'
+audio_length = 16384
+window_radius = 200
 
 # Set Model Hyperparameters
 class HyperParameters():
@@ -43,7 +48,7 @@ class HyperParameters():
         self.D_updates_per_G_update = D_update_per_G_update
         self.WGAN_GP_weight = 10
 
-hp = HyperParameters(10, 20, 5, 100)
+hp = HyperParameters(1, 20, 5, 100)
 
 
 def get_generator():
@@ -178,15 +183,11 @@ def make_discriminator_model(generator, discriminator):
 
     real_samples = Input(shape=(16384, hp.c))
     generator_input_for_discriminator = Input(shape=(5, 5, 5, hp.c))
-    print(generator_input_for_discriminator)
-    print(generator_input_for_discriminator.shape)
     generated_samples_for_discriminator = generator(generator_input_for_discriminator)
     discriminator_output_from_generator = discriminator(generated_samples_for_discriminator)
     # Need to modify real_samples to include original input
     discriminator_output_from_real_samples = discriminator([real_samples, generator_input_for_discriminator])
     averaged_samples = RandomWeightedAverage()([real_samples, generated_samples_for_discriminator[0]])
-    print([real_samples, generated_samples_for_discriminator[0]])
-    print(averaged_samples)
     averaged_samples_out = discriminator([averaged_samples, generator_input_for_discriminator])
 
     partial_gp_loss = partial(gradient_penalty_loss,
@@ -208,12 +209,51 @@ def make_discriminator_model(generator, discriminator):
 def get_noise(shape):
     return np.random.uniform(-1, 1, shape).astype(np.float32)
 
-def load_videos(x):
-    return np.ones((1000, 16384, 10)), np.ones((1000, 5, 5, 5, 10))
+def pad_or_truncate(array, length):
+    if len(array) > length:
+        return array[:length]
+
+    return_val = np.zeros((length,))
+    return_val[:len(array)] = array
+
+    return return_val
+
+def crop_videos(video, x, y, crop_window_radius):
+    center_x = int(video.shape[1] * float(x))
+    center_y = int(video.shape[2] * float(y))
+
+    x_length = video.shape[1] - 1
+    y_length = video.shape[2] - 1
+
+    x_low = min(center_x - crop_window_radius, 0)
+    x_high = max(center_x + crop_window_radius, x_length)
+    y_low = min(center_y - crop_window_radius, 0)
+    y_high = max(center_y + crop_window_radius, y_length)
+
+    video = np.pad(video, ((0, 0), (-x_low, x_high - x_length), (-y_low, y_high - y_length), (0, 0)), mode='edge')
+
+    center_x += x_low
+    center_y += y_low
+
+    return video[:, center_x-crop_window_radius:center_x+crop_window_radius,
+            center_y-crop_window_radius:center_y+crop_window_radius,
+            :]
+
+def load_videos(filename, window_radius):
+    audio = []
+    videos = []
+    with open(filename, 'rb') as opened_file:
+        all_info = pickle.load(opened_file)
+        for row in all_info:
+            audio.append(pad_or_truncate(row[0], audio_length))
+            videos.append(crop_videos(row[1], row[2], row[3], window_radius))
+
+    return np.asarray(audio), np.asarray(videos)
+    # return np.ones((1000, 16384, 10)), np.ones((1000, 5, 5, 5, 10))
 
 def train(epochs):
     np.random.seed(NP_RANDOM_SEED)
-    X_train_audio, X_train_video = load_videos(1)
+    X_train_audio, X_train_video = load_videos(test_data, window_radius)
     # np.random.shuffle(X_train_audio)
 
     discriminator = get_discriminator()
