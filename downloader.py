@@ -62,7 +62,7 @@ def download_file(filename, prefix, num_videos=None):
         print(e)
 
     num_downloaded = 0
-    available_files = os.listdir('{}_videos'.format(prefix))
+    available_files = set(os.listdir('{}_videos'.format(prefix)))
 
     with open(filename) as csv_file:
         # Format of csv files is: YouTube ID, start segment, end segment, X coordinate, Y coordinate
@@ -72,6 +72,7 @@ def download_file(filename, prefix, num_videos=None):
             filename_mp4 = f'{prefix}_videos/{video_id}.mp4'
             if filename_mp4 in available_files: # skip if video already downloaded
                 continue
+            available_files.add(filename_mp4)
 
             start_time = (string_to_int(row[1]) + string_to_int(row[2]))//2
             end_time = start_time + 1
