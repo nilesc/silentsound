@@ -13,6 +13,7 @@ def extract_info(filename, prefix):
     available_files = os.listdir('{}_videos'.format(prefix))
 
     all_data = []
+    seen_videos = set()
     with open(filename) as csv_file:
         csv_reader = csv.reader(csv_file, delimiter=',')
         for row in csv_reader:
@@ -23,12 +24,18 @@ def extract_info(filename, prefix):
             if '{}.mp4'.format(video_id) not in available_files:
                 continue
 
+            if video_id in seen_videos:
+                continue
+
+            seen_videos.add(video_id)
+
             rate, data = wavfile.read('{}_audio/{}.wav'.format(prefix, video_id)) # sample rate is samples/sec
 
             # 1D array with one audio channel
             #data = np.ravel(np.delete(data, 1, 1))
 
             cap = cv2.VideoCapture('{}_videos/{}.mp4'.format(prefix, video_id))
+            num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))*2
 
             if cap.isOpened() == False:
                 print("Error opening video file.")
@@ -36,12 +43,14 @@ def extract_info(filename, prefix):
 
             # Read until video is completed
             frames = []
-            while cap.isOpened():
-                _, frame = cap.read()
+            while True:
+                ret, frame = cap.read()
+                if not ret:
+                    break
 
                 frames.append(frame)
 
-                cap.release()
+            cap.release()
 
             frames_np = np.asarray(frames)
             all_data.append((data, frames_np, face_x, face_y, rate))

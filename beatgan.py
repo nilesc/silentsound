@@ -31,23 +31,30 @@ import wavfile24
 import os
 import os.path
 import glob
+import pickle
 
 NP_RANDOM_SEED = 2000
+train_data = 'test_condensed.pkl'
+test_data = 'test_condensed.pkl'
+audio_length = 16384
 
 # Set Model Hyperparameters
 class HyperParameters():
-    def __init__(self, num_channels, batch_size, model_size, D_update_per_G_update):
+    def __init__(self, num_channels, batch_size, model_size, D_update_per_G_update, window_radius, num_frames):
         self.c = num_channels
         self.b = batch_size
         self.d = model_size
         self.D_updates_per_G_update = D_update_per_G_update
         self.WGAN_GP_weight = 10
+        self.window_radius = window_radius
+        self.num_frames = num_frames
+        self.video_shape = (num_frames, 2*window_radius, 2*window_radius, 3)
 
-hp = HyperParameters(10, 20, 5, 100)
+hp = HyperParameters(1, 20, 5, 100, 50, 10)
 
 
 def get_generator():
-    model_input = Input(shape=(5, 5, 5, hp.c))
+    model_input = Input(shape=hp.video_shape)
     # Change input_dim to be the size of our video
     model = Conv3D(16, 5, strides=1, padding='valid', data_format='channels_last')(model_input)
     model = Flatten()(model)
@@ -84,7 +91,7 @@ def get_discriminator():
     audio_model = LeakyReLU(alpha=0.2)(audio_model)
     audio_model = Reshape((256*hp.d, ), input_shape = (1, 16, 16*hp.d))(audio_model)
 
-    video_model_input = Input(shape=(5, 5, 5, hp.c))
+    video_model_input = Input(shape=(hp.video_shape))
     video_model = Conv3D(16, 5, strides=1, padding='valid', data_format='channels_last')(video_model_input)
     video_model = Flatten()(video_model)
 
@@ -95,7 +102,7 @@ def get_discriminator():
     return Model(inputs=[audio_model_input, video_model_input], outputs=final_model)
 
 def generator_containing_discriminator(generator, discriminator):
-    model = Input(shape=(5, 5, 5, hp.c))
+    model = Input(shape=(hp.video_shape))
     model = generator(model)
     model = discriminator(model)
     return model
@@ -159,7 +166,7 @@ def make_generator_model(generator, discriminator):
         layer.trainable = False
     discriminator.trainable = False
 
-    generator_input = Input(shape=(5, 5, 5, hp.c))
+    generator_input = Input(shape=hp.video_shape)
     generator_layers = generator(generator_input)
     discriminator_layers_for_generator = discriminator(generator_layers)
     generator_model = Model(inputs=[generator_input], outputs=[discriminator_layers_for_generator])
@@ -177,16 +184,12 @@ def make_discriminator_model(generator, discriminator):
     generator.trainable = False
 
     real_samples = Input(shape=(16384, hp.c))
-    generator_input_for_discriminator = Input(shape=(5, 5, 5, hp.c))
-    print(generator_input_for_discriminator)
-    print(generator_input_for_discriminator.shape)
+    generator_input_for_discriminator = Input(shape=hp.video_shape)
     generated_samples_for_discriminator = generator(generator_input_for_discriminator)
     discriminator_output_from_generator = discriminator(generated_samples_for_discriminator)
     # Need to modify real_samples to include original input
     discriminator_output_from_real_samples = discriminator([real_samples, generator_input_for_discriminator])
     averaged_samples = RandomWeightedAverage()([real_samples, generated_samples_for_discriminator[0]])
-    print([real_samples, generated_samples_for_discriminator[0]])
-    print(averaged_samples)
     averaged_samples_out = discriminator([averaged_samples, generator_input_for_discriminator])
 
     partial_gp_loss = partial(gradient_penalty_loss,
@@ -208,12 +211,60 @@ def make_discriminator_model(generator, discriminator):
 def get_noise(shape):
     return np.random.uniform(-1, 1, shape).astype(np.float32)
 
-def load_videos(x):
-    return np.ones((1000, 16384, 10)), np.ones((1000, 5, 5, 5, 10))
+def pad_or_truncate(array, length):
+    if len(array) > length:
+        return array[:length]
+
+    return_val = np.zeros((length,))
+    return_val[:len(array)] = array
+
+    return return_val
+
+def crop_videos(video, x, y, crop_window_radius):
+    center_x = int(video.shape[1] * float(x))
+    center_y = int(video.shape[2] * float(y))
+
+    x_length = video.shape[1] - 1
+    y_length = video.shape[2] - 1
+
+    x_low = min(center_x - crop_window_radius, 0)
+    x_high = max(center_x + crop_window_radius, x_length)
+    y_low = min(center_y - crop_window_radius, 0)
+    y_high = max(center_y + crop_window_radius, y_length)
+
+    video = np.pad(video, ((0, 0), (-x_low, x_high - x_length), (-y_low, y_high - y_length), (0, 0)), mode='edge')
+
+    center_x -= x_low
+    center_y -= y_low
+
+    cropped = video[:,
+            center_x-crop_window_radius:center_x+crop_window_radius,
+            center_y-crop_window_radius:center_y+crop_window_radius,
+            :]
+
+    return video[:,
+            center_x-crop_window_radius:center_x+crop_window_radius,
+            center_y-crop_window_radius:center_y+crop_window_radius,
+            :]
+
+def load_videos(filename, window_radius):
+    audio = []
+    videos = []
+    with open(filename, 'rb') as opened_file:
+        all_info = pickle.load(opened_file)
+        for row in all_info:
+            audio.append(pad_or_truncate(row[0], audio_length))
+            videos.append(crop_videos(row[1], row[2], row[3], window_radius))
+
+    for video in videos:
+        print(video.shape)
+
+    return np.asarray(audio), np.asarray(videos)
+    # return np.ones((1000, 16384, 10)), np.ones((1000, 5, 5, 5, 10))
 
 def train(epochs):
     np.random.seed(NP_RANDOM_SEED)
-    X_train_audio, X_train_video = load_videos(1)
+    X_train_audio, X_train_video = load_videos(test_data, hp.window_radius)
     # np.random.shuffle(X_train_audio)
 
     discriminator = get_discriminator()
@@ -235,17 +286,9 @@ def train(epochs):
         dl, gl = {}, {}
         # np.random.shuffle(X_train)
         for index in range(int(X_train_audio.shape[0]/hp.b)):
-            print(X_train_audio[index*hp.b:(index+1)*hp.b].shape)
-            print(X_train_video[index*hp.b:(index+1)*hp.b].shape)
-            print()
             audio_batch = X_train_audio[index*hp.b:(index+1)*hp.b].reshape(hp.b, 16384, hp.c)
-            video_batch = X_train_video[index*hp.b:(index+1)*hp.b].reshape(hp.b, 5, 5, 5, 10)
+            video_batch = X_train_video[index*hp.b:(index+1)*hp.b].reshape((hp.b,) + hp.video_shape)
             # noise = get_noise((BATCH_SIZE, 100))
-            print(audio_batch.shape)
-            print(video_batch.shape)
-            print(positive_y.shape)
-            print(negative_y.shape)
-            print(dummy_y.shape)
             d_loss = discriminator_model.train_on_batch([audio_batch, video_batch], [positive_y, negative_y, dummy_y])
             dl = d_loss
             if index % hp.D_updates_per_G_update == 0:
