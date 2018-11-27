@@ -50,7 +50,7 @@ class HyperParameters():
         self.num_frames = num_frames
         self.video_shape = (num_frames, 2*window_radius, 2*window_radius, 3)
 
-hp = HyperParameters(1, 20, 5, 100, 50, 10)
+hp = HyperParameters(2, 5, 5, 100, 25, 5)
 
 
 def get_generator():
@@ -286,6 +286,7 @@ def train(epochs):
         dl, gl = {}, {}
         # np.random.shuffle(X_train)
         for index in range(int(X_train_audio.shape[0]/hp.b)):
+            print(X_train_audio[index*hp.b:(index+1)*hp.b].shape)
             audio_batch = X_train_audio[index*hp.b:(index+1)*hp.b].reshape(hp.b, 16384, hp.c)
             video_batch = X_train_video[index*hp.b:(index+1)*hp.b].reshape((hp.b,) + hp.video_shape)
             # noise = get_noise((BATCH_SIZE, 100))
@@ -303,7 +304,7 @@ def train(epochs):
             print("epoch %d g_loss : %0.10f" % (epoch, gl))
             generator.save_weights('weights/generator' + str(epoch) + '.h5', True)
             discriminator.save_weights('weights/discriminator' + str(epoch) + '.h5', True)
-            generate_one(generator, epoch, 0)
+            # generate_one(generator, epoch, 0)
 
 def generate_one(generator, epoch, index):
     noise = get_noise((1,100))
