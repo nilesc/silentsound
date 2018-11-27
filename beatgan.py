@@ -237,14 +237,15 @@ def crop_videos(video, num_frames, x, y, crop_window_radius):
     center_x -= x_low
     center_y -= y_low
     frames_per_sec = 30
-    frame_indices = np.linspace(0, frames_per_sec - 1, num_frames).astype(int)
+    first_sec = video[:frames_per_sec]
+    frame_indices = np.linspace(0, first_sec.shape[0] - 1, num_frames).astype(int)
 
-    cropped = video[:frames_per_sec,
+    reduced_frames = first_sec[frame_indices]
+
+    return reduced_frames[:,
             center_x-crop_window_radius:center_x+crop_window_radius,
             center_y-crop_window_radius:center_y+crop_window_radius,
             :]
-
-    return cropped[frame_indices]
 
 def load_videos(filename, window_radius):
     audio = []
