@@ -34,7 +34,7 @@ import glob
 import pickle
 
 NP_RANDOM_SEED = 2000
-train_data = 'test_condensed.pkl'
+train_data = 'train_condensed.pkl'
 test_data = 'test_condensed.pkl'
 audio_length = 16384
 
@@ -251,20 +251,23 @@ def load_videos(filename, window_radius):
     audio = []
     videos = []
     with open(filename, 'rb') as opened_file:
-        all_info = pickle.load(opened_file)
-        for row in all_info:
+        unpickler = pickle.Unpickler(opened_file)
+        row = None
+        while True:
+            try:
+                row = unpickler.load()
+            except EOFError:
+                break
+
             audio.append(pad_or_truncate(row[0], audio_length))
             videos.append(crop_videos(row[1], row[2], row[3], window_radius))
-
-    for video in videos:
-        print(video.shape)
 
     return np.asarray(audio), np.asarray(videos)
     # return np.ones((1000, 16384, 10)), np.ones((1000, 5, 5, 5, 10))
 
 def train(epochs):
     np.random.seed(NP_RANDOM_SEED)
-    X_train_audio, X_train_video = load_videos(test_data, hp.window_radius)
+    X_train_audio, X_train_video = load_videos(train_data, hp.window_radius)
     # np.random.shuffle(X_train_audio)
 
     discriminator = get_discriminator()
