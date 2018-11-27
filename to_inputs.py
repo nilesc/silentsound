@@ -12,8 +12,10 @@ def string_to_int(x):
 def extract_info(filename, prefix):
     available_files = os.listdir('{}_videos'.format(prefix))
 
-    all_data = []
     seen_videos = set()
+    f = open(f'{prefix}_condensed.pkl', 'wb')
+    pickler = pickle.Pickler(f)
+
     with open(filename) as csv_file:
         csv_reader = csv.reader(csv_file, delimiter=',')
         for row in csv_reader:
@@ -29,10 +31,10 @@ def extract_info(filename, prefix):
 
             seen_videos.add(video_id)
 
-            rate, data = wavfile.read('{}_audio/{}.wav'.format(prefix, video_id)) # sample rate is samples/sec
+            rate, audio_data = wavfile.read('{}_audio/{}.wav'.format(prefix, video_id)) # sample rate is samples/sec
 
             # 1D array with one audio channel
-            #data = np.ravel(np.delete(data, 1, 1))
+            data = np.ravel(np.delete(data, 1, 1))
 
             cap = cv2.VideoCapture('{}_videos/{}.mp4'.format(prefix, video_id))
             num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))*2
@@ -53,11 +55,8 @@ def extract_info(filename, prefix):
             cap.release()
 
             frames_np = np.asarray(frames)
-            all_data.append((data, frames_np, face_x, face_y, rate))
 
-    with open('{}_condensed.pkl'.format(prefix), 'wb') as output_file:
-        pickle.dump(all_data, output_file, pickle.HIGHEST_PROTOCOL)
-
+            pickler.dump((audio_data, frames_np, face_x, face_y, rate))
 
 if __name__ == '__main__':
     if len(sys.argv) != 3:
