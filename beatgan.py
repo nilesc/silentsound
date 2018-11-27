@@ -34,7 +34,7 @@ import glob
 import pickle
 
 NP_RANDOM_SEED = 2000
-train_data = 'test_condensed.pkl'
+train_data = 'train_condensed.pkl'
 test_data = 'test_condensed.pkl'
 audio_length = 16384
 
@@ -220,7 +220,7 @@ def pad_or_truncate(array, length):
 
     return return_val
 
-def crop_videos(video, x, y, crop_window_radius):
+def crop_videos(video, num_frames, x, y, crop_window_radius):
     center_x = int(video.shape[1] * float(x))
     center_y = int(video.shape[2] * float(y))
 
@@ -236,16 +236,15 @@ def crop_videos(video, x, y, crop_window_radius):
 
     center_x -= x_low
     center_y -= y_low
+    frames_per_sec = 30
+    frame_indices = np.linspace(0, frames_per_sec - 1, num_frames).astype(int)
 
-    cropped = video[:,
+    cropped = video[:frames_per_sec,
             center_x-crop_window_radius:center_x+crop_window_radius,
             center_y-crop_window_radius:center_y+crop_window_radius,
             :]
 
-    return video[:,
-            center_x-crop_window_radius:center_x+crop_window_radius,
-            center_y-crop_window_radius:center_y+crop_window_radius,
-            :]
+    return cropped[frame_indices]
 
 def load_videos(filename, window_radius):
     audio = []
@@ -254,7 +253,7 @@ def load_videos(filename, window_radius):
         all_info = pickle.load(opened_file)
         for row in all_info:
             audio.append(pad_or_truncate(row[0], audio_length))
-            videos.append(crop_videos(row[1], row[2], row[3], window_radius))
+            videos.append(crop_videos(row[1], hp.num_frames, row[2], row[3], window_radius))
 
     for video in videos:
         print(video.shape)
