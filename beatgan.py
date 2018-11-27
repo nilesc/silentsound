@@ -264,7 +264,7 @@ def load_videos(filename, window_radius):
 
 def train(epochs):
     np.random.seed(NP_RANDOM_SEED)
-    X_train_audio, X_train_video = load_videos(test_data, hp.window_radius)
+    X_train_audio, X_train_video = load_videos(train_data, hp.window_radius)
     # np.random.shuffle(X_train_audio)
 
     discriminator = get_discriminator()
