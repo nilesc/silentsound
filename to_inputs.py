@@ -34,7 +34,7 @@ def extract_info(filename, prefix):
             rate, audio_data = wavfile.read('{}_audio/{}.wav'.format(prefix, video_id)) # sample rate is samples/sec
 
             # 1D array with one audio channel
-            data = np.ravel(np.delete(data, 1, 1))
+            data = np.ravel(np.delete(audio_data, 1, 1))
 
             cap = cv2.VideoCapture('{}_videos/{}.mp4'.format(prefix, video_id))
             num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))*2
@@ -56,7 +56,7 @@ def extract_info(filename, prefix):
 
             frames_np = np.asarray(frames)
 
-            pickler.dump((audio_data, frames_np, face_x, face_y, rate))
+            pickler.dump((data, frames_np, face_x, face_y, rate, video_id))
 
 if __name__ == '__main__':
     if len(sys.argv) != 3:
