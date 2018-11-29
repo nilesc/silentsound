@@ -55,9 +55,12 @@ hp = HyperParameters(1, 20, 5, 100, 50, 10)
 
 def get_generator():
     model_input = Input(shape=hp.video_shape)
-    # Change input_dim to be the size of our video
+
+    # Change below here
     model = Conv3D(16, 5, strides=1, padding='valid', data_format='channels_last')(model_input)
+    # Change above here
     model = Flatten()(model)
+
     model = Dense(units=256*hp.d)(model)
     # Add layers here to connect video_size to the 100 units
     model = Reshape((1, 16, 16*hp.d), input_shape = (256*hp.d,))(model)
@@ -78,7 +81,6 @@ def get_generator():
 
 def get_discriminator():
     audio_model_input = Input(shape=(16384, hp.c))
-
     audio_model = Conv1D(hp.d, 25, strides=4, padding="same", input_shape=(16384, hp.c))(audio_model_input)
     audio_model = LeakyReLU(alpha=0.2)(audio_model)
     audio_model = Conv1D(2*hp.d, 25, strides=4, padding="same")(audio_model)
@@ -92,11 +94,15 @@ def get_discriminator():
     audio_model = Reshape((256*hp.d, ), input_shape = (1, 16, 16*hp.d))(audio_model)
 
     video_model_input = Input(shape=(hp.video_shape))
+    # Change below here
     video_model = Conv3D(16, 5, strides=1, padding='valid', data_format='channels_last')(video_model_input)
+    # Change above here
     video_model = Flatten()(video_model)
 
     final_model = Concatenate()([audio_model, video_model])
+    # Change below here
     final_model = Dense(256)(final_model)
+    # Change above here
     final_model = Dense(1)(final_model)
 
     return Model(inputs=[audio_model_input, video_model_input], outputs=final_model)
@@ -256,11 +262,7 @@ def load_videos(filename, window_radius):
             audio.append(pad_or_truncate(row[0], audio_length))
             videos.append(crop_videos(row[1], row[2], row[3], window_radius))
 
-    for video in videos:
-        print(video.shape)
-
     return np.asarray(audio), np.asarray(videos)
-    # return np.ones((1000, 16384, 10)), np.ones((1000, 5, 5, 5, 10))
 
 def train(epochs):
     np.random.seed(NP_RANDOM_SEED)
