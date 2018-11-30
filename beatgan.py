@@ -257,11 +257,17 @@ def load_videos(filename, window_radius):
     audio = []
     videos = []
     with open(filename, 'rb') as opened_file:
-        all_info = pickle.load(opened_file)
-        for row in all_info:
+        unpickler = pickle.Unpickler(opened_file)
+        row = None
+        while True:
+            try:
+                row = unpickler.load()
+            except EOFError:
+                break
+
             audio.append(pad_or_truncate(row[0], audio_length))
             videos.append(crop_videos(row[1], hp.num_frames, row[2], row[3], window_radius))
-
+            
     return np.asarray(audio), np.asarray(videos)
 
 def train(epochs):
