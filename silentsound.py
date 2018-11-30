@@ -4,4 +4,4 @@ import numpy as np
 generator = beatgan.get_generator()
 discriminator = beatgan.get_discriminator()
 
-beatgan.train(1)
+beatgan.train(50)

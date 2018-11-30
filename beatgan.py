@@ -34,7 +34,7 @@ import glob
 import pickle
 
 NP_RANDOM_SEED = 2000
-train_data = 'test_condensed.pkl'
+train_data = 'train_condensed.pkl'
 test_data = 'test_condensed.pkl'
 audio_length = 16384
 
@@ -50,7 +50,7 @@ class HyperParameters():
         self.num_frames = num_frames
         self.video_shape = (num_frames, 2*window_radius, 2*window_radius, 3)
 
-hp = HyperParameters(1, 20, 5, 100, 50, 10)
+hp = HyperParameters(2, 5, 5, 100, 25, 5)
 
 
 def get_generator():
@@ -226,7 +226,7 @@ def pad_or_truncate(array, length):
 
     return return_val
 
-def crop_videos(video, x, y, crop_window_radius):
+def crop_videos(video, num_frames, x, y, crop_window_radius):
     center_x = int(video.shape[1] * float(x))
     center_y = int(video.shape[2] * float(y))
 
@@ -242,13 +242,13 @@ def crop_videos(video, x, y, crop_window_radius):
 
     center_x -= x_low
     center_y -= y_low
+    frames_per_sec = 30
+    first_sec = video[:frames_per_sec]
+    frame_indices = np.linspace(0, first_sec.shape[0] - 1, num_frames).astype(int)
 
-    cropped = video[:,
-            center_x-crop_window_radius:center_x+crop_window_radius,
-            center_y-crop_window_radius:center_y+crop_window_radius,
-            :]
+    reduced_frames = first_sec[frame_indices]
 
-    return video[:,
+    return reduced_frames[:,
             center_x-crop_window_radius:center_x+crop_window_radius,
             center_y-crop_window_radius:center_y+crop_window_radius,
             :]
@@ -260,13 +260,13 @@ def load_videos(filename, window_radius):
         all_info = pickle.load(opened_file)
         for row in all_info:
             audio.append(pad_or_truncate(row[0], audio_length))
-            videos.append(crop_videos(row[1], row[2], row[3], window_radius))
+            videos.append(crop_videos(row[1], hp.num_frames, row[2], row[3], window_radius))
 
     return np.asarray(audio), np.asarray(videos)
 
 def train(epochs):
     np.random.seed(NP_RANDOM_SEED)
-    X_train_audio, X_train_video = load_videos(test_data, hp.window_radius)
+    X_train_audio, X_train_video = load_videos(train_data, hp.window_radius)
     # np.random.shuffle(X_train_audio)
 
     discriminator = get_discriminator()
@@ -288,6 +288,7 @@ def train(epochs):
         dl, gl = {}, {}
         # np.random.shuffle(X_train)
         for index in range(int(X_train_audio.shape[0]/hp.b)):
+            print(X_train_audio[index*hp.b:(index+1)*hp.b].shape)
             audio_batch = X_train_audio[index*hp.b:(index+1)*hp.b].reshape(hp.b, 16384, hp.c)
             video_batch = X_train_video[index*hp.b:(index+1)*hp.b].reshape((hp.b,) + hp.video_shape)
             # noise = get_noise((BATCH_SIZE, 100))
@@ -305,7 +306,7 @@ def train(epochs):
             print("epoch %d g_loss : %0.10f" % (epoch, gl))
             generator.save_weights('weights/generator' + str(epoch) + '.h5', True)
             discriminator.save_weights('weights/discriminator' + str(epoch) + '.h5', True)
-            generate_one(generator, epoch, 0)
+            # generate_one(generator, epoch, 0)
 
 def generate_one(generator, epoch, index):
     noise = get_noise((1,100))
