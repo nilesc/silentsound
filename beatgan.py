@@ -50,14 +50,17 @@ class HyperParameters():
         self.num_frames = num_frames
         self.video_shape = (num_frames, 2*window_radius, 2*window_radius, 3)
 
-hp = HyperParameters(1, 20, 5, 100, 50, 10)
+hp = HyperParameters(2, 5, 5, 100, 25, 5)
 
 
 def get_generator():
     model_input = Input(shape=hp.video_shape)
-    # Change input_dim to be the size of our video
+
+    # Change below here
     model = Conv3D(16, 5, strides=1, padding='valid', data_format='channels_last')(model_input)
+    # Change above here
     model = Flatten()(model)
+
     model = Dense(units=256*hp.d)(model)
     # Add layers here to connect video_size to the 100 units
     model = Reshape((1, 16, 16*hp.d), input_shape = (256*hp.d,))(model)
@@ -78,7 +81,6 @@ def get_generator():
 
 def get_discriminator():
     audio_model_input = Input(shape=(16384, hp.c))
-
     audio_model = Conv1D(hp.d, 25, strides=4, padding="same", input_shape=(16384, hp.c))(audio_model_input)
     audio_model = LeakyReLU(alpha=0.2)(audio_model)
     audio_model = Conv1D(2*hp.d, 25, strides=4, padding="same")(audio_model)
@@ -92,11 +94,15 @@ def get_discriminator():
     audio_model = Reshape((256*hp.d, ), input_shape = (1, 16, 16*hp.d))(audio_model)
 
     video_model_input = Input(shape=(hp.video_shape))
+    # Change below here
     video_model = Conv3D(16, 5, strides=1, padding='valid', data_format='channels_last')(video_model_input)
+    # Change above here
     video_model = Flatten()(video_model)
 
     final_model = Concatenate()([audio_model, video_model])
+    # Change below here
     final_model = Dense(256)(final_model)
+    # Change above here
     final_model = Dense(1)(final_model)
 
     return Model(inputs=[audio_model_input, video_model_input], outputs=final_model)
@@ -220,7 +226,7 @@ def pad_or_truncate(array, length):
 
     return return_val
 
-def crop_videos(video, x, y, crop_window_radius):
+def crop_videos(video, num_frames, x, y, crop_window_radius):
     center_x = int(video.shape[1] * float(x))
     center_y = int(video.shape[2] * float(y))
 
@@ -236,13 +242,13 @@ def crop_videos(video, x, y, crop_window_radius):
 
     center_x -= x_low
     center_y -= y_low
+    frames_per_sec = 30
+    first_sec = video[:frames_per_sec]
+    frame_indices = np.linspace(0, first_sec.shape[0] - 1, num_frames).astype(int)
 
-    cropped = video[:,
-            center_x-crop_window_radius:center_x+crop_window_radius,
-            center_y-crop_window_radius:center_y+crop_window_radius,
-            :]
+    reduced_frames = first_sec[frame_indices]
 
-    return video[:,
+    return reduced_frames[:,
             center_x-crop_window_radius:center_x+crop_window_radius,
             center_y-crop_window_radius:center_y+crop_window_radius,
             :]
@@ -260,10 +266,9 @@ def load_videos(filename, window_radius):
                 break
 
             audio.append(pad_or_truncate(row[0], audio_length))
-            videos.append(crop_videos(row[1], row[2], row[3], window_radius))
-
+            videos.append(crop_videos(row[1], hp.num_frames, row[2], row[3], window_radius))
+            
     return np.asarray(audio), np.asarray(videos)
-    # return np.ones((1000, 16384, 10)), np.ones((1000, 5, 5, 5, 10))
 
 def train(epochs):
     np.random.seed(NP_RANDOM_SEED)
@@ -289,6 +294,7 @@ def train(epochs):
         dl, gl = {}, {}
         # np.random.shuffle(X_train)
         for index in range(int(X_train_audio.shape[0]/hp.b)):
+            print(X_train_audio[index*hp.b:(index+1)*hp.b].shape)
             audio_batch = X_train_audio[index*hp.b:(index+1)*hp.b].reshape(hp.b, 16384, hp.c)
             video_batch = X_train_video[index*hp.b:(index+1)*hp.b].reshape((hp.b,) + hp.video_shape)
             # noise = get_noise((BATCH_SIZE, 100))
@@ -306,7 +312,7 @@ def train(epochs):
             print("epoch %d g_loss : %0.10f" % (epoch, gl))
             generator.save_weights('weights/generator' + str(epoch) + '.h5', True)
             discriminator.save_weights('weights/discriminator' + str(epoch) + '.h5', True)
-            generate_one(generator, epoch, 0)
+            # generate_one(generator, epoch, 0)
 
 def generate_one(generator, epoch, index):
     noise = get_noise((1,100))
