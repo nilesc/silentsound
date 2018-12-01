@@ -11,6 +11,7 @@ def string_to_int(x):
 
 def extract_info(filename, prefix):
     available_files = os.listdir('{}_videos'.format(prefix))
+    available_audio = os.listdir('{}_audio'.format(prefix))
 
     seen_videos = set()
 
@@ -25,6 +26,9 @@ def extract_info(filename, prefix):
                 continue
 
             if video_id in seen_videos:
+                continue
+
+            if '{}.wav'.format(video_id) not in available_audio:
                 continue
 
             f = open('{}_inputs/{}.pkl'.format(prefix, video_id), 'wb')
