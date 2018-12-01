@@ -34,8 +34,8 @@ import glob
 import pickle
 
 NP_RANDOM_SEED = 2000
-train_data = 'train_condensed.pkl'
-test_data = 'test_condensed.pkl'
+train_data = 'train_inputs'
+test_data = 'test_inputs'
 audio_length = 16384
 
 # Set Model Hyperparameters
@@ -71,7 +71,7 @@ def get_generator():
     model = MaxPooling3D(pool_size=(2, 2, 2), strides=1, padding='valid', data_format='channels_last')(model)
     model = Flatten()(model)
     model = Dense(1024, activation='relu')(model)
-    
+
     # Change above here
 
     model = Dense(units=256*hp.d)(model)
@@ -269,18 +269,19 @@ def crop_videos(video, num_frames, x, y, crop_window_radius):
 def load_videos(filename, window_radius):
     audio = []
     videos = []
-    with open(filename, 'rb') as opened_file:
-        unpickler = pickle.Unpickler(opened_file)
-        row = None
-        while True:
-            try:
-                row = unpickler.load()
-            except EOFError:
-                break
+    for filename in os.listdir(train_data):
+        with open(f'{train_data}/{filename}', 'rb') as opened_file:
+            unpickler = pickle.Unpickler(opened_file)
+            row = None
+            while True:
+                try:
+                    row = unpickler.load()
+                except EOFError:
+                    break
 
-            audio.append(pad_or_truncate(row[0], audio_length))
-            videos.append(crop_videos(row[1], hp.num_frames, row[2], row[3], window_radius))
-            
+                audio.append(pad_or_truncate(row[0], audio_length))
+                videos.append(crop_videos(row[1], hp.num_frames, row[2], row[3], window_radius))
+
     return np.asarray(audio), np.asarray(videos)
 
 def train(epochs):
