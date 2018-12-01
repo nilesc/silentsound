@@ -13,7 +13,6 @@ def extract_info(filename, prefix):
     available_files = os.listdir('{}_videos'.format(prefix))
 
     seen_videos = set()
-    f = open(f'{prefix}_condensed.pkl', 'wb')
     pickler = pickle.Pickler(f)
 
     with open(filename) as csv_file:
@@ -28,6 +27,8 @@ def extract_info(filename, prefix):
 
             if video_id in seen_videos:
                 continue
+
+            f = open(f'{prefix}_inputs/{video_id}.pkl', 'wb')
 
             seen_videos.add(video_id)
 
@@ -57,6 +58,7 @@ def extract_info(filename, prefix):
             frames_np = np.asarray(frames)
 
             pickler.dump((data, frames_np, face_x, face_y, rate, video_id))
+            f.close()
 
 if __name__ == '__main__':
     if len(sys.argv) != 3:
