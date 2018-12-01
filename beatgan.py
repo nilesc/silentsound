@@ -15,7 +15,7 @@ from keras.layers.merge import Concatenate, _Merge
 from keras.layers.core import Activation, Lambda
 from keras.layers.normalization import BatchNormalization
 from keras.layers.convolutional import UpSampling2D, Conv1D, Conv3D
-from keras.layers.convolutional import Convolution2D, AveragePooling2D, Conv2DTranspose
+from keras.layers.convolutional import Convolution2D, AveragePooling2D, Conv2DTranspose, MaxPooling3D
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.core import Flatten
 from keras.optimizers import SGD, Adam
@@ -40,25 +40,38 @@ audio_length = 16384
 
 # Set Model Hyperparameters
 class HyperParameters():
-    def __init__(self, num_channels, batch_size, model_size, D_update_per_G_update, window_radius, downsample_factor, num_frames):
+    def __init__(self, num_channels, batch_size, model_size, D_update_per_G_update, window_radius, num_frames):
         self.c = num_channels
         self.b = batch_size
         self.d = model_size
         self.D_updates_per_G_update = D_update_per_G_update
         self.WGAN_GP_weight = 10
         self.window_radius = window_radius
-        self.downsample_factor = downsample_factor
         self.num_frames = num_frames
-        self.video_shape = (num_frames, 2*window_radius, 2*window_radius, 3)
+        self.video_shape = (num_frames, 2*window_radius, 2*window_radius, 3) # (5, 50, 50, 3)
 
-hp = HyperParameters(1, 20, 5, 100, 100, 4, 10)
+hp = HyperParameters(2, 5, 5, 100, 25, 5)
 
 
 def get_generator():
     model_input = Input(shape=hp.video_shape)
 
     # Change below here
-    model = Conv3D(16, 5, strides=1, padding='valid', data_format='channels_last')(model_input)
+    model = Conv3D(filters=16, kernel_size=3, strides=1, padding='valid', data_format='channels_last')(model_input)
+    model = Activation('relu')(model)
+    model = Conv3D(filters=16, kernel_size=3, strides=1, padding='valid', data_format='channels_last')(model)
+    model = MaxPooling3D(pool_size=(2, 2, 2), strides=1, padding='valid', data_format='channels_last')(model)
+    model = Conv3D(filters=32, kernel_size=3, strides=1, padding='valid', data_format='channels_last')(model)
+    model = Activation('relu')(model)
+    model = Conv3D(filters=32, kernel_size=3, strides=1, padding='valid', data_format='channels_last')(model)
+    model = Activation('relu')(model)
+    model = Conv3D(filters=64, kernel_size=3, strides=1, padding='valid', data_format='channels_last')(model)
+    model = Activation('relu')(model)
+    model = Conv3D(filters=64, kernel_size=3, strides=1, padding='valid', data_format='channels_last')(model)
+    model = MaxPooling3D(pool_size=(2, 2, 2), strides=1, padding='valid', data_format='channels_last')(model)
+    model = Flatten()(model)
+    model = Dense(1024, activation='relu')(model)
+    
     # Change above here
     model = Flatten()(model)
 
@@ -227,8 +240,7 @@ def pad_or_truncate(array, length):
 
     return return_val
 
-def crop_videos(video, num_frames, x, y, crop_window_radius, downsample_factor):
-
+def crop_videos(video, num_frames, x, y, crop_window_radius):
     center_x = int(video.shape[1] * float(x))
     center_y = int(video.shape[2] * float(y))
 
@@ -250,18 +262,12 @@ def crop_videos(video, num_frames, x, y, crop_window_radius, downsample_factor):
 
     reduced_frames = first_sec[frame_indices]
 
-    cropped = reduced_frames[:,
+    return reduced_frames[:,
             center_x-crop_window_radius:center_x+crop_window_radius,
             center_y-crop_window_radius:center_y+crop_window_radius,
             :]
-    downsampled = cropped[:,
-            ::downsample_factor,
-            ::downsample_factor,
-            :]
 
-    return downsampled
-
-def load_videos(filename, window_radius, downsample_factor):
+def load_videos(filename, window_radius):
     audio = []
     videos = []
     with open(filename, 'rb') as opened_file:
@@ -274,13 +280,13 @@ def load_videos(filename, window_radius, downsample_factor):
                 break
 
             audio.append(pad_or_truncate(row[0], audio_length))
-            videos.append(crop_videos(row[1], hp.num_frames, row[2], row[3], window_radius, downsample_factor))
+            videos.append(crop_videos(row[1], hp.num_frames, row[2], row[3], window_radius))
             
     return np.asarray(audio), np.asarray(videos)
 
 def train(epochs):
     np.random.seed(NP_RANDOM_SEED)
-    X_train_audio, X_train_video = load_videos(test_data, hp.window_radius, hp.downsample_factor)
+    X_train_audio, X_train_video = load_videos(train_data, hp.window_radius)
     # np.random.shuffle(X_train_audio)
 
     discriminator = get_discriminator()
