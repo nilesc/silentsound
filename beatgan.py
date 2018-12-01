@@ -50,7 +50,7 @@ class HyperParameters():
         self.num_frames = num_frames
         self.video_shape = (num_frames, 2*window_radius, 2*window_radius, 3) # (5, 50, 50, 3)
 
-hp = HyperParameters(2, 5, 5, 100, 25, 30)
+hp = HyperParameters(1, 5, 5, 100, 25, 10)
 
 
 def get_generator():
@@ -63,11 +63,11 @@ def get_generator():
     model = MaxPooling3D(pool_size=(2, 2, 2), strides=1, padding='valid', data_format='channels_last')(model)
     model = Conv3D(filters=32, kernel_size=3, strides=1, padding='valid', data_format='channels_last')(model)
     model = Activation('relu')(model)
-    model = Conv3D(filters=32, kernel_size=3, strides=1, padding='valid', data_format='channels_last')(model)
+    model = Conv3D(filters=32, kernel_size=(1, 3, 3), strides=1, padding='valid', data_format='channels_last')(model)
     model = Activation('relu')(model)
-    model = Conv3D(filters=64, kernel_size=3, strides=1, padding='valid', data_format='channels_last')(model)
+    model = Conv3D(filters=64, kernel_size=(1, 3, 3), strides=1, padding='valid', data_format='channels_last')(model)
     model = Activation('relu')(model)
-    model = Conv3D(filters=64, kernel_size=3, strides=1, padding='valid', data_format='channels_last')(model)
+    model = Conv3D(filters=64, kernel_size=(1, 3, 3), strides=1, padding='valid', data_format='channels_last')(model)
     model = MaxPooling3D(pool_size=(2, 2, 2), strides=1, padding='valid', data_format='channels_last')(model)
     model = Flatten()(model)
     model = Dense(1024, activation='relu')(model)
@@ -270,7 +270,7 @@ def load_videos(filename, window_radius):
     audio = []
     videos = []
     for filename in os.listdir(train_data):
-        with open(f'{train_data}/{filename}', 'rb') as opened_file:
+        with open('{}/{}'.format(train_data, filename), 'rb') as opened_file:
             unpickler = pickle.Unpickler(opened_file)
             row = None
             while True:
