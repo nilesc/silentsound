@@ -108,9 +108,21 @@ def get_discriminator():
 
     video_model_input = Input(shape=(hp.video_shape))
     # Change below here
-    video_model = Conv3D(16, 5, strides=1, padding='valid', data_format='channels_last')(video_model_input)
-    # Change above here
+    video_model = Conv3D(filters=16, kernel_size=3, strides=1, padding='valid', data_format='channels_last')(video_model_input)
+    video_model = Activation('relu')(video_model)
+    video_model = Conv3D(filters=16, kernel_size=3, strides=1, padding='valid', data_format='channels_last')(video_model)
+    video_model = MaxPooling3D(pool_size=(2, 2, 2), strides=1, padding='valid', data_format='channels_last')(video_model)
+    video_model = Conv3D(filters=32, kernel_size=3, strides=1, padding='valid', data_format='channels_last')(video_model)
+    video_model = Activation('relu')(video_model)
+    video_model = Conv3D(filters=32, kernel_size=(1, 3, 3), strides=1, padding='valid', data_format='channels_last')(video_model)
+    video_model = Activation('relu')(video_model)
+    video_model = Conv3D(filters=64, kernel_size=(1, 3, 3), strides=1, padding='valid', data_format='channels_last')(video_model)
+    video_model = Activation('relu')(video_model)
+    video_model = Conv3D(filters=64, kernel_size=(1, 3, 3), strides=1, padding='valid', data_format='channels_last')(video_model)
+    video_model = MaxPooling3D(pool_size=(2, 2, 2), strides=1, padding='valid', data_format='channels_last')(video_model)
     video_model = Flatten()(video_model)
+    video_model = Dense(1024, activation='relu')(video_model)
+    # Change above here
 
     final_model = Concatenate()([audio_model, video_model])
     # Change below here
