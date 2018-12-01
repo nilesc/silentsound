@@ -13,7 +13,6 @@ def extract_info(filename, prefix):
     available_files = os.listdir('{}_videos'.format(prefix))
 
     seen_videos = set()
-    pickler = pickle.Pickler(f)
 
     with open(filename) as csv_file:
         csv_reader = csv.reader(csv_file, delimiter=',')
@@ -29,6 +28,7 @@ def extract_info(filename, prefix):
                 continue
 
             f = open(f'{prefix}_inputs/{video_id}.pkl', 'wb')
+            pickler = pickle.Pickler(f)
 
             seen_videos.add(video_id)
 
