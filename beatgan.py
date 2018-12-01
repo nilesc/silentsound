@@ -40,17 +40,18 @@ audio_length = 16384
 
 # Set Model Hyperparameters
 class HyperParameters():
-    def __init__(self, num_channels, batch_size, model_size, D_update_per_G_update, window_radius, num_frames):
+    def __init__(self, num_channels, batch_size, model_size, D_update_per_G_update, window_radius, downsample_factor, num_frames):
         self.c = num_channels
         self.b = batch_size
         self.d = model_size
         self.D_updates_per_G_update = D_update_per_G_update
         self.WGAN_GP_weight = 10
         self.window_radius = window_radius
+        self.downsample_factor = downsample_factor
         self.num_frames = num_frames
         self.video_shape = (num_frames, 2*window_radius, 2*window_radius, 3)
 
-hp = HyperParameters(2, 5, 5, 100, 25, 5)
+hp = HyperParameters(1, 20, 5, 100, 100, 4, 10)
 
 
 def get_generator():
@@ -226,7 +227,8 @@ def pad_or_truncate(array, length):
 
     return return_val
 
-def crop_videos(video, num_frames, x, y, crop_window_radius):
+def crop_videos(video, num_frames, x, y, crop_window_radius, downsample_factor):
+
     center_x = int(video.shape[1] * float(x))
     center_y = int(video.shape[2] * float(y))
 
@@ -248,12 +250,18 @@ def crop_videos(video, num_frames, x, y, crop_window_radius):
 
     reduced_frames = first_sec[frame_indices]
 
-    return reduced_frames[:,
+    cropped = reduced_frames[:,
             center_x-crop_window_radius:center_x+crop_window_radius,
             center_y-crop_window_radius:center_y+crop_window_radius,
             :]
+    downsampled = cropped[:,
+            ::downsample_factor,
+            ::downsample_factor,
+            :]
 
-def load_videos(filename, window_radius):
+    return downsampled
+
+def load_videos(filename, window_radius, downsample_factor):
     audio = []
     videos = []
     with open(filename, 'rb') as opened_file:
@@ -266,13 +274,13 @@ def load_videos(filename, window_radius):
                 break
 
             audio.append(pad_or_truncate(row[0], audio_length))
-            videos.append(crop_videos(row[1], hp.num_frames, row[2], row[3], window_radius))
+            videos.append(crop_videos(row[1], hp.num_frames, row[2], row[3], window_radius, downsample_factor))
             
     return np.asarray(audio), np.asarray(videos)
 
 def train(epochs):
     np.random.seed(NP_RANDOM_SEED)
-    X_train_audio, X_train_video = load_videos(train_data, hp.window_radius)
+    X_train_audio, X_train_video = load_videos(test_data, hp.window_radius, hp.downsample_factor)
     # np.random.shuffle(X_train_audio)
 
     discriminator = get_discriminator()
