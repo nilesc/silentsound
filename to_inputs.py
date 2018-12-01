@@ -27,7 +27,7 @@ def extract_info(filename, prefix):
             if video_id in seen_videos:
                 continue
 
-            f = open(f'{prefix}_inputs/{video_id}.pkl', 'wb')
+            f = open('{}_inputs/{}.pkl'.format(prefix, video_id), 'wb')
             pickler = pickle.Pickler(f)
 
             seen_videos.add(video_id)
