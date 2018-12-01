@@ -50,7 +50,7 @@ class HyperParameters():
         self.num_frames = num_frames
         self.video_shape = (num_frames, 2*window_radius, 2*window_radius, 3) # (5, 50, 50, 3)
 
-hp = HyperParameters(2, 5, 5, 100, 25, 5)
+hp = HyperParameters(2, 5, 5, 100, 25, 30)
 
 
 def get_generator():
@@ -73,7 +73,6 @@ def get_generator():
     model = Dense(1024, activation='relu')(model)
     
     # Change above here
-    model = Flatten()(model)
 
     model = Dense(units=256*hp.d)(model)
     # Add layers here to connect video_size to the 100 units
