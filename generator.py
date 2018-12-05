@@ -1,10 +1,10 @@
-from beatgan import get_generator
+import beatgan
 import sys
 
-def generate_batch(generator, weights_file):
-    noise = get_noise((hp.b,100))
+def generate_batch(generator, weights_file, pickle_file):
+    _, source_videos = beatgan.load_videos(pickle_file, beatgan.hp.window_radius, beatgan.hp.downsample_factor)
     generator.load_weights(weights_file)
-    generated_audio = generator.predict(noise, verbose=1)
+    generated_audio = generator.predict(source_videos, verbose=1)
     re_normalization_factor = 8388608
     assumed_sample_length = 14112
     sample_rate = 14700
@@ -14,9 +14,10 @@ def generate_batch(generator, weights_file):
         wavfile24.write('generated_outputs/output' + ("%03d" % i) + '.wav', sample_rate, np.concatenate((q[:assumed_sample_length], q[:assumed_sample_length])), bitrate=24)
 
 if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        print('Please provide a weights file to generate from')
+    if len(sys.argv) != 3:
+        print('Please provide a weights file to generate from and a pickle file of source videos')
         sys.exit()
     weights_file = sys.argv[1]
-    generator = get_generator()
-    generate_batch(generator, weights_file)
+    pickle_file = sys.argv[2]
+    generator = beatgan.get_generator()
+    generate_batch(generator, weights_file, pickle_file)
