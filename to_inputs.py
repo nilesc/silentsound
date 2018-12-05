@@ -11,10 +11,9 @@ def string_to_int(x):
 
 def extract_info(filename, prefix):
     available_files = os.listdir('{}_videos'.format(prefix))
+    available_audio = os.listdir('{}_audio'.format(prefix))
 
     seen_videos = set()
-    f = open(f'{prefix}_condensed.pkl', 'wb')
-    pickler = pickle.Pickler(f)
 
     with open(filename) as csv_file:
         csv_reader = csv.reader(csv_file, delimiter=',')
@@ -28,6 +27,12 @@ def extract_info(filename, prefix):
 
             if video_id in seen_videos:
                 continue
+
+            if '{}.wav'.format(video_id) not in available_audio:
+                continue
+
+            f = open('{}_inputs/{}.pkl'.format(prefix, video_id), 'wb')
+            pickler = pickle.Pickler(f)
 
             seen_videos.add(video_id)
 
@@ -57,6 +62,7 @@ def extract_info(filename, prefix):
             frames_np = np.asarray(frames)
 
             pickler.dump((data, frames_np, face_x, face_y, rate, video_id))
+            f.close()
 
 if __name__ == '__main__':
     if len(sys.argv) != 3:

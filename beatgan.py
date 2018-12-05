@@ -15,7 +15,7 @@ from keras.layers.merge import Concatenate, _Merge
 from keras.layers.core import Activation, Lambda
 from keras.layers.normalization import BatchNormalization
 from keras.layers.convolutional import UpSampling2D, Conv1D, Conv3D
-from keras.layers.convolutional import Convolution2D, AveragePooling2D, Conv2DTranspose
+from keras.layers.convolutional import Convolution2D, AveragePooling2D, Conv2DTranspose, MaxPooling3D
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.core import Flatten
 from keras.optimizers import SGD, Adam
@@ -32,35 +32,48 @@ import os
 import os.path
 import glob
 import pickle
+import csv
 
 NP_RANDOM_SEED = 2000
-train_data = 'train_condensed.pkl'
-test_data = 'test_condensed.pkl'
+train_data = 'train_inputs'
+test_data = 'test_inputs'
 audio_length = 16384
 
 # Set Model Hyperparameters
 class HyperParameters():
-    def __init__(self, num_channels, batch_size, model_size, D_update_per_G_update, window_radius, downsample_factor, num_frames):
+    def __init__(self, num_channels, batch_size, model_size, D_update_per_G_update, window_radius, num_frames):
         self.c = num_channels
         self.b = batch_size
         self.d = model_size
         self.D_updates_per_G_update = D_update_per_G_update
         self.WGAN_GP_weight = 10
         self.window_radius = window_radius
-        self.downsample_factor = downsample_factor
         self.num_frames = num_frames
-        self.video_shape = (num_frames, 2*window_radius, 2*window_radius, 3)
+        self.video_shape = (num_frames, 2*window_radius, 2*window_radius, 3) # (5, 50, 50, 3)
 
-hp = HyperParameters(1, 20, 5, 100, 100, 4, 10)
+hp = HyperParameters(1, 5, 5, 100, 25, 10)
 
 
 def get_generator():
     model_input = Input(shape=hp.video_shape)
 
     # Change below here
-    model = Conv3D(16, 5, strides=1, padding='valid', data_format='channels_last')(model_input)
-    # Change above here
+    model = Conv3D(filters=16, kernel_size=3, strides=1, padding='valid', data_format='channels_last')(model_input)
+    model = Activation('relu')(model)
+    model = Conv3D(filters=16, kernel_size=3, strides=1, padding='valid', data_format='channels_last')(model)
+    model = MaxPooling3D(pool_size=(2, 2, 2), strides=1, padding='valid', data_format='channels_last')(model)
+    model = Conv3D(filters=32, kernel_size=3, strides=1, padding='valid', data_format='channels_last')(model)
+    model = Activation('relu')(model)
+    model = Conv3D(filters=32, kernel_size=(1, 3, 3), strides=1, padding='valid', data_format='channels_last')(model)
+    model = Activation('relu')(model)
+    model = Conv3D(filters=64, kernel_size=(1, 3, 3), strides=1, padding='valid', data_format='channels_last')(model)
+    model = Activation('relu')(model)
+    model = Conv3D(filters=64, kernel_size=(1, 3, 3), strides=1, padding='valid', data_format='channels_last')(model)
+    model = MaxPooling3D(pool_size=(2, 2, 2), strides=1, padding='valid', data_format='channels_last')(model)
     model = Flatten()(model)
+    model = Dense(1024, activation='relu')(model)
+
+    # Change above here
 
     model = Dense(units=256*hp.d)(model)
     # Add layers here to connect video_size to the 100 units
@@ -96,13 +109,28 @@ def get_discriminator():
 
     video_model_input = Input(shape=(hp.video_shape))
     # Change below here
-    video_model = Conv3D(16, 5, strides=1, padding='valid', data_format='channels_last')(video_model_input)
-    # Change above here
+    video_model = Conv3D(filters=16, kernel_size=3, strides=1, padding='valid', data_format='channels_last')(video_model_input)
+    video_model = Activation('relu')(video_model)
+    video_model = Conv3D(filters=16, kernel_size=3, strides=1, padding='valid', data_format='channels_last')(video_model)
+    video_model = MaxPooling3D(pool_size=(2, 2, 2), strides=1, padding='valid', data_format='channels_last')(video_model)
+    video_model = Conv3D(filters=32, kernel_size=3, strides=1, padding='valid', data_format='channels_last')(video_model)
+    video_model = Activation('relu')(video_model)
+    video_model = Conv3D(filters=32, kernel_size=(1, 3, 3), strides=1, padding='valid', data_format='channels_last')(video_model)
+    video_model = Activation('relu')(video_model)
+    video_model = Conv3D(filters=64, kernel_size=(1, 3, 3), strides=1, padding='valid', data_format='channels_last')(video_model)
+    video_model = Activation('relu')(video_model)
+    video_model = Conv3D(filters=64, kernel_size=(1, 3, 3), strides=1, padding='valid', data_format='channels_last')(video_model)
+    video_model = MaxPooling3D(pool_size=(2, 2, 2), strides=1, padding='valid', data_format='channels_last')(video_model)
     video_model = Flatten()(video_model)
+    video_model = Dense(1024, activation='relu')(video_model)
+    # Change above here
 
     final_model = Concatenate()([audio_model, video_model])
     # Change below here
     final_model = Dense(256)(final_model)
+    final_model = Dense(256)(final_model)
+    final_model = Dense(128)(final_model)
+    final_model = Dense(64)(final_model)
     # Change above here
     final_model = Dense(1)(final_model)
 
@@ -227,8 +255,7 @@ def pad_or_truncate(array, length):
 
     return return_val
 
-def crop_videos(video, num_frames, x, y, crop_window_radius, downsample_factor):
-
+def crop_videos(video, num_frames, x, y, crop_window_radius):
     center_x = int(video.shape[1] * float(x))
     center_y = int(video.shape[2] * float(y))
 
@@ -250,37 +277,32 @@ def crop_videos(video, num_frames, x, y, crop_window_radius, downsample_factor):
 
     reduced_frames = first_sec[frame_indices]
 
-    cropped = reduced_frames[:,
+    return reduced_frames[:,
             center_x-crop_window_radius:center_x+crop_window_radius,
             center_y-crop_window_radius:center_y+crop_window_radius,
             :]
-    downsampled = cropped[:,
-            ::downsample_factor,
-            ::downsample_factor,
-            :]
 
-    return downsampled
-
-def load_videos(filename, window_radius, downsample_factor):
+def load_videos(filename, window_radius):
     audio = []
     videos = []
-    with open(filename, 'rb') as opened_file:
-        unpickler = pickle.Unpickler(opened_file)
-        row = None
-        while True:
-            try:
-                row = unpickler.load()
-            except EOFError:
-                break
+    for filename in os.listdir(train_data):
+        with open('{}/{}'.format(train_data, filename), 'rb') as opened_file:
+            unpickler = pickle.Unpickler(opened_file)
+            row = None
+            while True:
+                try:
+                    row = unpickler.load()
+                except EOFError:
+                    break
 
-            audio.append(pad_or_truncate(row[0], audio_length))
-            videos.append(crop_videos(row[1], hp.num_frames, row[2], row[3], window_radius, downsample_factor))
-            
+                audio.append(pad_or_truncate(row[0], audio_length))
+                videos.append(crop_videos(row[1], hp.num_frames, row[2], row[3], window_radius))
+
     return np.asarray(audio), np.asarray(videos)
 
 def train(epochs):
     np.random.seed(NP_RANDOM_SEED)
-    X_train_audio, X_train_video = load_videos(test_data, hp.window_radius, hp.downsample_factor)
+    X_train_audio, X_train_video = load_videos(train_data, hp.window_radius)
     # np.random.shuffle(X_train_audio)
 
     discriminator = get_discriminator()
@@ -315,9 +337,14 @@ def train(epochs):
                 gl = g_loss
                 #print("batch %d g_loss : %0.10f" % (index, g_loss))
 
-        if epoch % 500 == 0:
+        if epoch % 200 == 0:
             print("epoch %d d_loss : %s" % (epoch, dl))
             print("epoch %d g_loss : %0.10f" % (epoch, gl))
+
+            with open('weights/losses.csv', mode='a+') as loss_file:
+                loss_writer = csv.writer(loss_file)
+                loss_writer.writerow([epoch, dl, gl])
+
             generator.save_weights('weights/generator' + str(epoch) + '.h5', True)
             discriminator.save_weights('weights/discriminator' + str(epoch) + '.h5', True)
             # generate_one(generator, epoch, 0)
