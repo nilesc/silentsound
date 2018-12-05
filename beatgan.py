@@ -56,6 +56,7 @@ hp = HyperParameters(1, 5, 5, 100, 25, 10)
 
 def get_generator():
     model_input = Input(shape=hp.video_shape)
+    input_copied = Lambda(lambda x: x, input_shape=model_input.shape[1:])(model_input)
 
     # Change below here
     model = Conv3D(filters=16, kernel_size=3, strides=1, padding='valid', data_format='channels_last')(model_input)
@@ -91,7 +92,7 @@ def get_generator():
     model = Activation('tanh')(model)
     model = Reshape((16384, hp.c), input_shape = (1, 16384, hp.c))(model)
 
-    return Model(inputs=model_input, outputs=(model, model_input))
+    return Model(inputs=model_input, outputs=(model, input_copied))
 
 def get_discriminator():
     audio_model_input = Input(shape=(16384, hp.c))
