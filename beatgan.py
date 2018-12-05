@@ -32,6 +32,7 @@ import os
 import os.path
 import glob
 import pickle
+import csv
 
 NP_RANDOM_SEED = 2000
 train_data = 'train_inputs'
@@ -127,6 +128,9 @@ def get_discriminator():
     final_model = Concatenate()([audio_model, video_model])
     # Change below here
     final_model = Dense(256)(final_model)
+    final_model = Dense(256)(final_model)
+    final_model = Dense(128)(final_model)
+    final_model = Dense(64)(final_model)
     # Change above here
     final_model = Dense(1)(final_model)
 
@@ -333,9 +337,14 @@ def train(epochs):
                 gl = g_loss
                 #print("batch %d g_loss : %0.10f" % (index, g_loss))
 
-        if epoch % 500 == 0:
+        if epoch % 200 == 0:
             print("epoch %d d_loss : %s" % (epoch, dl))
             print("epoch %d g_loss : %0.10f" % (epoch, gl))
+
+            with open('weights/losses.csv', mode='a+') as loss_file:
+                loss_writer = csv.writer(loss_file)
+                loss_writer.writerow([epoch, dl, gl])
+
             generator.save_weights('weights/generator' + str(epoch) + '.h5', True)
             discriminator.save_weights('weights/discriminator' + str(epoch) + '.h5', True)
             # generate_one(generator, epoch, 0)
