@@ -285,6 +285,7 @@ def crop_videos(video, num_frames, x, y, crop_window_radius):
 def load_videos(filename, window_radius):
     audio = []
     videos = []
+    video_ids = []
     for filename in os.listdir(train_data):
         with open('{}/{}'.format(train_data, filename), 'rb') as opened_file:
             unpickler = pickle.Unpickler(opened_file)
@@ -297,12 +298,13 @@ def load_videos(filename, window_radius):
 
                 audio.append(pad_or_truncate(row[0], audio_length))
                 videos.append(crop_videos(row[1], hp.num_frames, row[2], row[3], window_radius))
+                video_ids.append(row[5])
 
-    return np.asarray(audio), np.asarray(videos)
+    return np.asarray(audio), np.asarray(videos), video_ids
 
 def train(epochs):
     np.random.seed(NP_RANDOM_SEED)
-    X_train_audio, X_train_video = load_videos(train_data, hp.window_radius)
+    X_train_audio, X_train_video, _ = load_videos(train_data, hp.window_radius)
     # np.random.shuffle(X_train_audio)
 
     discriminator = get_discriminator()
