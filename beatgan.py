@@ -56,6 +56,7 @@ hp = HyperParameters(1, 5, 5, 100, 25, 10)
 
 def get_generator():
     model_input = Input(shape=hp.video_shape)
+    input_copied = Lambda(lambda x: x, input_shape=model_input.shape[1:])(model_input)
 
     # Change below here
     model = Conv3D(filters=16, kernel_size=3, strides=1, padding='valid', data_format='channels_last')(model_input)
@@ -91,7 +92,7 @@ def get_generator():
     model = Activation('tanh')(model)
     model = Reshape((16384, hp.c), input_shape = (1, 16384, hp.c))(model)
 
-    return Model(inputs=model_input, outputs=(model, model_input))
+    return Model(inputs=model_input, outputs=(model, input_copied))
 
 def get_discriminator():
     audio_model_input = Input(shape=(16384, hp.c))
@@ -285,6 +286,7 @@ def crop_videos(video, num_frames, x, y, crop_window_radius):
 def load_videos(filename, window_radius):
     audio = []
     videos = []
+    video_ids = []
     for filename in os.listdir(train_data):
         with open('{}/{}'.format(train_data, filename), 'rb') as opened_file:
             unpickler = pickle.Unpickler(opened_file)
@@ -297,12 +299,13 @@ def load_videos(filename, window_radius):
 
                 audio.append(pad_or_truncate(row[0], audio_length))
                 videos.append(crop_videos(row[1], hp.num_frames, row[2], row[3], window_radius))
+                video_ids.append(row[5])
 
-    return np.asarray(audio), np.asarray(videos)
+    return np.asarray(audio), np.asarray(videos), video_ids
 
 def train(epochs):
     np.random.seed(NP_RANDOM_SEED)
-    X_train_audio, X_train_video = load_videos(train_data, hp.window_radius)
+    X_train_audio, X_train_video, _ = load_videos(train_data, hp.window_radius)
     # np.random.shuffle(X_train_audio)
 
     discriminator = get_discriminator()
