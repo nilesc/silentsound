@@ -16,6 +16,7 @@ from keras.layers.core import Activation, Lambda
 from keras.layers.normalization import BatchNormalization
 from keras.layers.convolutional import UpSampling2D, Conv1D, Conv3D
 from keras.layers.convolutional import Convolution2D, AveragePooling2D, Conv2DTranspose, MaxPooling3D
+from keras.regularizers import l2
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.core import Flatten
 from keras.optimizers import SGD, Adam
@@ -38,6 +39,7 @@ NP_RANDOM_SEED = 2000
 train_data = 'train_inputs'
 test_data = 'test_inputs'
 audio_length = 16384
+regularization_penalty = 0.01
 
 # Set Model Hyperparameters
 class HyperParameters():
@@ -59,17 +61,17 @@ def get_generator():
     input_copied = Lambda(lambda x: x, input_shape=model_input.shape[1:])(model_input)
 
     # Change below here
-    model = Conv3D(filters=16, kernel_size=3, strides=1, padding='valid', data_format='channels_last')(model_input)
+    model = Conv3D(filters=16, kernel_size=3, strides=1, padding='valid', data_format='channels_last', kernel_regularizer=l2(regularization_penalty))(model_input)
     model = Activation('relu')(model)
-    model = Conv3D(filters=16, kernel_size=3, strides=1, padding='valid', data_format='channels_last')(model)
+    model = Conv3D(filters=16, kernel_size=3, strides=1, padding='valid', data_format='channels_last', kernel_regularizer=l2(regularization_penalty))(model)
     model = MaxPooling3D(pool_size=(2, 2, 2), strides=1, padding='valid', data_format='channels_last')(model)
-    model = Conv3D(filters=32, kernel_size=3, strides=1, padding='valid', data_format='channels_last')(model)
+    model = Conv3D(filters=32, kernel_size=3, strides=1, padding='valid', data_format='channels_last', kernel_regularizer=l2(regularization_penalty))(model)
     model = Activation('relu')(model)
-    model = Conv3D(filters=32, kernel_size=(1, 3, 3), strides=1, padding='valid', data_format='channels_last')(model)
+    model = Conv3D(filters=32, kernel_size=(1, 3, 3), strides=1, padding='valid', data_format='channels_last', kernel_regularizer=l2(regularization_penalty))(model)
     model = Activation('relu')(model)
-    model = Conv3D(filters=64, kernel_size=(1, 3, 3), strides=1, padding='valid', data_format='channels_last')(model)
+    model = Conv3D(filters=64, kernel_size=(1, 3, 3), strides=1, padding='valid', data_format='channels_last', kernel_regularizer=l2(regularization_penalty))(model)
     model = Activation('relu')(model)
-    model = Conv3D(filters=64, kernel_size=(1, 3, 3), strides=1, padding='valid', data_format='channels_last')(model)
+    model = Conv3D(filters=64, kernel_size=(1, 3, 3), strides=1, padding='valid', data_format='channels_last', kernel_regularizer=l2(regularization_penalty))(model)
     model = MaxPooling3D(pool_size=(2, 2, 2), strides=1, padding='valid', data_format='channels_last')(model)
     model = Flatten()(model)
     model = Dense(1024, activation='relu')(model)
@@ -80,15 +82,15 @@ def get_generator():
     # Add layers here to connect video_size to the 100 units
     model = Reshape((1, 16, 16*hp.d), input_shape = (256*hp.d,))(model)
     model = Activation('relu')(model)
-    model = Conv2DTranspose(8*hp.d, (1,25), strides=(1,4), padding="same", data_format='channels_last')(model)
+    model = Conv2DTranspose(8*hp.d, (1,25), strides=(1,4), padding="same", data_format='channels_last', kernel_regularizer=l2(regularization_penalty))(model)
     model = Activation('relu')(model)
-    model = Conv2DTranspose(4*hp.d, (1,25), strides=(1,4), padding="same", data_format='channels_last')(model)
+    model = Conv2DTranspose(4*hp.d, (1,25), strides=(1,4), padding="same", data_format='channels_last', kernel_regularizer=l2(regularization_penalty))(model)
     model = Activation('relu')(model)
-    model = Conv2DTranspose(2*hp.d, (1,25), strides=(1,4), padding="same", data_format='channels_last')(model)
+    model = Conv2DTranspose(2*hp.d, (1,25), strides=(1,4), padding="same", data_format='channels_last', kernel_regularizer=l2(regularization_penalty))(model)
     model = Activation('relu')(model)
-    model = Conv2DTranspose(hp.d, (1,25), strides=(1,4), padding="same", data_format='channels_last')(model)
+    model = Conv2DTranspose(hp.d, (1,25), strides=(1,4), padding="same", data_format='channels_last', kernel_regularizer=l2(regularization_penalty))(model)
     model = Activation('relu')(model)
-    model = Conv2DTranspose(hp.c, (1,25), strides=(1,4), padding="same", data_format='channels_last')(model)
+    model = Conv2DTranspose(hp.c, (1,25), strides=(1,4), padding="same", data_format='channels_last', kernel_regularizer=l2(regularization_penalty))(model)
     model = Activation('tanh')(model)
     model = Reshape((16384, hp.c), input_shape = (1, 16384, hp.c))(model)
 
@@ -96,31 +98,31 @@ def get_generator():
 
 def get_discriminator():
     audio_model_input = Input(shape=(16384, hp.c))
-    audio_model = Conv1D(hp.d, 25, strides=4, padding="same", input_shape=(16384, hp.c))(audio_model_input)
+    audio_model = Conv1D(hp.d, 25, strides=4, padding="same", input_shape=(16384, hp.c), kernel_regularizer=l2(regularization_penalty))(audio_model_input)
     audio_model = LeakyReLU(alpha=0.2)(audio_model)
-    audio_model = Conv1D(2*hp.d, 25, strides=4, padding="same")(audio_model)
+    audio_model = Conv1D(2*hp.d, 25, strides=4, padding="same", kernel_regularizer=l2(regularization_penalty))(audio_model)
     audio_model = LeakyReLU(alpha=0.2)(audio_model)
-    audio_model = Conv1D(4*hp.d, 25, strides=4, padding="same")(audio_model)
+    audio_model = Conv1D(4*hp.d, 25, strides=4, padding="same", kernel_regularizer=l2(regularization_penalty))(audio_model)
     audio_model = LeakyReLU(alpha=0.2)(audio_model)
-    audio_model = Conv1D(8*hp.d, 25, strides=4, padding="same")(audio_model)
+    audio_model = Conv1D(8*hp.d, 25, strides=4, padding="same", kernel_regularizer=l2(regularization_penalty))(audio_model)
     audio_model = LeakyReLU(alpha=0.2)(audio_model)
-    audio_model = Conv1D(16*hp.d, 25, strides=4, padding="same")(audio_model)
+    audio_model = Conv1D(16*hp.d, 25, strides=4, padding="same", kernel_regularizer=l2(regularization_penalty))(audio_model)
     audio_model = LeakyReLU(alpha=0.2)(audio_model)
     audio_model = Reshape((256*hp.d, ), input_shape = (1, 16, 16*hp.d))(audio_model)
 
     video_model_input = Input(shape=(hp.video_shape))
     # Change below here
-    video_model = Conv3D(filters=16, kernel_size=3, strides=1, padding='valid', data_format='channels_last')(video_model_input)
+    video_model = Conv3D(filters=16, kernel_size=3, strides=1, padding='valid', data_format='channels_last', kernel_regularizer=l2(regularization_penalty))(video_model_input)
     video_model = Activation('relu')(video_model)
-    video_model = Conv3D(filters=16, kernel_size=3, strides=1, padding='valid', data_format='channels_last')(video_model)
+    video_model = Conv3D(filters=16, kernel_size=3, strides=1, padding='valid', data_format='channels_last', kernel_regularizer=l2(regularization_penalty))(video_model)
     video_model = MaxPooling3D(pool_size=(2, 2, 2), strides=1, padding='valid', data_format='channels_last')(video_model)
-    video_model = Conv3D(filters=32, kernel_size=3, strides=1, padding='valid', data_format='channels_last')(video_model)
+    video_model = Conv3D(filters=32, kernel_size=3, strides=1, padding='valid', data_format='channels_last', kernel_regularizer=l2(regularization_penalty))(video_model)
     video_model = Activation('relu')(video_model)
-    video_model = Conv3D(filters=32, kernel_size=(1, 3, 3), strides=1, padding='valid', data_format='channels_last')(video_model)
+    video_model = Conv3D(filters=32, kernel_size=(1, 3, 3), strides=1, padding='valid', data_format='channels_last', kernel_regularizer=l2(regularization_penalty))(video_model)
     video_model = Activation('relu')(video_model)
-    video_model = Conv3D(filters=64, kernel_size=(1, 3, 3), strides=1, padding='valid', data_format='channels_last')(video_model)
+    video_model = Conv3D(filters=64, kernel_size=(1, 3, 3), strides=1, padding='valid', data_format='channels_last', kernel_regularizer=l2(regularization_penalty))(video_model)
     video_model = Activation('relu')(video_model)
-    video_model = Conv3D(filters=64, kernel_size=(1, 3, 3), strides=1, padding='valid', data_format='channels_last')(video_model)
+    video_model = Conv3D(filters=64, kernel_size=(1, 3, 3), strides=1, padding='valid', data_format='channels_last', kernel_regularizer=l2(regularization_penalty))(video_model)
     video_model = MaxPooling3D(pool_size=(2, 2, 2), strides=1, padding='valid', data_format='channels_last')(video_model)
     video_model = Flatten()(video_model)
     video_model = Dense(1024, activation='relu')(video_model)
@@ -128,10 +130,10 @@ def get_discriminator():
 
     final_model = Concatenate()([audio_model, video_model])
     # Change below here
-    final_model = Dense(256)(final_model)
-    final_model = Dense(256)(final_model)
-    final_model = Dense(128)(final_model)
-    final_model = Dense(64)(final_model)
+    final_model = Dense(256, kernel_regularizer=l2(regularization_penalty))(final_model)
+    final_model = Dense(256, kernel_regularizer=l2(regularization_penalty))(final_model)
+    final_model = Dense(128, kernel_regularizer=l2(regularization_penalty))(final_model)
+    final_model = Dense(64, kernel_regularizer=l2(regularization_penalty))(final_model)
     # Change above here
     final_model = Dense(1)(final_model)
 
