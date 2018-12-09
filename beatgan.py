@@ -295,7 +295,10 @@ def load_videos(filename, window_radius):
 def train(epochs):
     np.random.seed(NP_RANDOM_SEED)
     X_train_audio, X_train_video, _ = load_videos(train_data, hp.window_radius)
-    # np.random.shuffle(X_train_audio)
+    shuffled_indices = np.arange(len(X_train_audio))
+    np.random.shuffle(shuffled_indices)
+    X_train_audio = X_train_audio[shuffled_indices]
+    X_train_video = X_train_video[shuffled_indices]
 
     discriminator = get_discriminator()
     generator = get_generator()
@@ -314,7 +317,10 @@ def train(epochs):
     for epoch in range(epochs):
         print("Epoch is", epoch)
         dl, gl = {}, {}
-        # np.random.shuffle(X_train)
+        shuffled_indices = np.arange(len(X_train_audio))
+        np.random.shuffle(shuffled_indices)
+        X_train_audio = X_train_audio[shuffled_indices]
+        X_train_video = X_train_video[shuffled_indices]
 
         for index in range(int(X_train_audio.shape[0]/hp.b)):
             print(X_train_audio[index*hp.b:(index+1)*hp.b].shape)
