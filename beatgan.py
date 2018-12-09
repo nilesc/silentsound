@@ -186,19 +186,6 @@ class RandomWeightedAverage(_Merge):
         weights = K.random_uniform((hp.b, shape[1], shape[2]))
         return (weights * inputs[0]) + ((1 - weights) * inputs[1])
 
-def generate_after_training():
-    generator = generator_model()
-    generator.compile(loss='binary_crossentropy', optimizer="SGD")
-    generator.load_weights('goodgenerator.h5')
-
-    noise = np.zeros((hp.b, 100))
-    for i in range(hp.b):
-        noise[i, :] = np.random.uniform(-1, 1, 100)
-    generated_audio = generator.predict(noise, verbose=1)
-    print(generated_audio.shape)
-    for audio in generated_audio:
-        wavfile.write('thing.wav', 14700, audio)
-
 def make_generator_model(generator, discriminator):
     for layer in discriminator.layers:
         layer.trainable = False
@@ -328,19 +315,17 @@ def train(epochs):
         print("Epoch is", epoch)
         dl, gl = {}, {}
         # np.random.shuffle(X_train)
+
         for index in range(int(X_train_audio.shape[0]/hp.b)):
             print(X_train_audio[index*hp.b:(index+1)*hp.b].shape)
             audio_batch = X_train_audio[index*hp.b:(index+1)*hp.b].reshape(hp.b, 16384, hp.c)
             video_batch = X_train_video[index*hp.b:(index+1)*hp.b].reshape((hp.b,) + hp.video_shape)
-            # noise = get_noise((BATCH_SIZE, 100))
             d_loss = discriminator_model.train_on_batch([audio_batch, video_batch], [positive_y, negative_y, dummy_y])
             dl = d_loss
             if index % hp.D_updates_per_G_update == 0:
-                #print("batch %d d_loss : %s" % (index, d_loss))
                 noise = get_noise((hp.b, 100))
                 g_loss = generator_model.train_on_batch(video_batch, positive_y)
                 gl = g_loss
-                #print("batch %d g_loss : %0.10f" % (index, g_loss))
 
         if epoch % 200 == 0:
             print("epoch %d d_loss : %s" % (epoch, dl))
@@ -352,74 +337,3 @@ def train(epochs):
 
             generator.save_weights('weights/generator' + str(epoch) + '.h5', True)
             discriminator.save_weights('weights/discriminator' + str(epoch) + '.h5', True)
-            # generate_one(generator, epoch, 0)
-
-def generate_one(generator, epoch, index):
-    noise = get_noise((1,100))
-    generated_audio = generator.predict(noise, verbose=1)
-    q = np.array(generated_audio[0]*8388608).astype('int32')
-    wavfile24.write('outputs/epoch' + ("%04d" % epoch) + 'index'+ ("%03d" % index) + '.wav', 14700, q, bitrate=24)
-
-def generate_batch(generator, weights_file):
-    noise = get_noise((hp.b,100))
-    generator.load_weights(weights_file)
-    generated_audio = generator.predict(noise, verbose=1)
-    re_normalization_factor = 8388608
-    assumed_sample_length = 14112
-    sample_rate = 14700
-    for i in range(len(generated_audio)):
-        output = generated_audio[i]
-        q = np.array(output*re_normalization_factor).astype('int32')
-        wavfile24.write('generated_outputs/output' + ("%03d" % i) + '.wav', sample_rate, np.concatenate((q[:assumed_sample_length], q[:assumed_sample_length])), bitrate=24)
-
-# train(6100, hp.b) - this was the original training call, 6k epochs
-
-
-# generator = get_generator()
-# generate_batch(generator, 'weights/generator6000.h5', 40)
-# print (compute_similarity_score(0.10))
-#
-# # Test Script that lets you manually check similarity of a generated output vs the training set
-# original_beats = load_beat_data(0)
-# X_train = load_beat_data(1)
-# generated_outputs = glob.glob(os.path.normpath('/home/narainsk/beat_gan/BeatsByGAN/generated_outputs/*.wav'))
-# generated_output_file = generated_outputs[15]
-# print ('using file' + generated_output_file)
-# normalization_factor = 8388608
-# num_samples_compared = 14112
-# b = (wavfile24.read(generated_output_file)[1])/normalization_factor
-# for i in range(len(original_beats)):
-#     a = X_train[i*5]
-#     error = np.sum(np.square(a[:num_samples_compared] - b[:num_samples_compared]))
-#     similarity = error/(np.sum(np.square(a[:num_samples_compared])))
-#     if similarity < 0.5:
-#         print (i)
-#         print (similarity)
-#         print (original_beats[i][1][:6])
-#         wavfile24.write('similarities_test/similar' + str(i) + '.wav', 44100, original_beats[i][1] , bitrate=24)
-#         wavfile24.write('similarities_test/similar' + str(i) + 'downsampled.wav', 14700, original_beats[i][1][::3] , bitrate=24)
-
-
-def load_wavegan_paper_drumhit_data(policy):
-    print("Loading data")
-    X_train = []
-    skip_list = set(['/home/narainsk/beat_gan/BeatsByGAN/drums/Roland JV 1080/MaxV - Guiro.wav'])
-    normalization_factor = 32768
-    paths = glob.glob(os.path.normpath(os.getcwd() + '/drums/*/*.wav'))
-    for i in range(len(paths)):
-        if paths[i] not in skip_list:
-            sound = wavfile.read(paths[i])
-            if policy == 0:
-                X_train.append(sound)
-            elif policy == 1:
-                if sound[1].size <= 44100:
-                    wavfile.write('temp.wav', 14700, sound[1][::3])
-                    temp = wavfile.read('temp.wav')
-                    normed = np.concatenate((temp[1], np.zeros(16384 - len(temp[1]))))/normalization_factor
-                    X_train.append(normed)
-    return np.array(X_train) if policy == 1 else X_train
-# X_train = load_wavegan_paper_drumhit_data(1)
-# np.random.shuffle(X_train)
-#
-# wavfile24.write('a.wav', 44100, X_train[0][1], bitrate=24)
-
