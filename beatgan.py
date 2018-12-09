@@ -7,28 +7,20 @@ from __future__ import division
 from keras import backend as K
 K.set_image_dim_ordering('th') # ensure our dimension notation matches
 
-from keras.models import Sequential
-from keras.layers import Dense, Input
-from keras.layers import Reshape
-from keras.models import Model
+from keras.models import Sequential, Model
+from keras.layers import Dense, Input, Reshape
 from keras.layers.merge import Concatenate, _Merge
-from keras.layers.core import Activation, Lambda
+from keras.layers.core import Activation, Lambda, Flatten
 from keras.layers.normalization import BatchNormalization
 from keras.layers.convolutional import UpSampling2D, Conv1D, Conv3D
 from keras.layers.convolutional import Convolution2D, AveragePooling2D, Conv2DTranspose, MaxPooling3D
 from keras.regularizers import l2
 from keras.layers.advanced_activations import LeakyReLU
-from keras.layers.core import Flatten
 from keras.optimizers import SGD, Adam
 from keras import utils
 import numpy as np
-from scipy.io import wavfile
-from PIL import Image, ImageOps
 from functools import partial
 import random
-import argparse
-import math
-import wavfile24
 import os
 import os.path
 import glob
