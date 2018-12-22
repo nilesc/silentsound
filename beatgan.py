@@ -69,8 +69,14 @@ def get_generator():
     model = Dense(1024, activation='relu')(model)
 
     # Change above here
+    wavegan_instance = get_wavegan()
+    model = wavegan_instance(model)
 
-    model = Dense(units=256*hp.d)(model)
+    return Model(inputs=model_input, outputs=(model, input_copied))
+
+def get_wavegan():
+    model_input = Input(shape=(1024,))
+    model = Dense(units=256*hp.d)(model_input)
     # Add layers here to connect video_size to the 100 units
     model = Reshape((1, 16, 16*hp.d), input_shape = (256*hp.d,))(model)
     model = Activation('relu')(model)
@@ -86,7 +92,7 @@ def get_generator():
     model = Activation('tanh')(model)
     model = Reshape((16384, hp.c), input_shape = (1, 16384, hp.c))(model)
 
-    return Model(inputs=model_input, outputs=(model, input_copied))
+    return Model(inputs=model_input, outputs=model)
 
 def get_discriminator():
     audio_model_input = Input(shape=(16384, hp.c))
