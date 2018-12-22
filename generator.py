@@ -17,5 +17,6 @@ if __name__ == '__main__':
         sys.exit()
     weights_file = sys.argv[1]
     pickle_file = sys.argv[2]
-    generator = beatgan.get_generator()
+    wavegan_instance = beatgan.get_wavegan()
+    generator = beatgan.get_generator(wavegan_instance)
     generate_batch(generator, weights_file, pickle_file)

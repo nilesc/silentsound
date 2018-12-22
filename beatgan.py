@@ -48,7 +48,7 @@ class HyperParameters():
 hp = HyperParameters(1, 5, 5, 100, 25, 10)
 
 
-def get_generator():
+def get_generator(wavegan_instance):
     model_input = Input(shape=hp.video_shape)
     input_copied = Lambda(lambda x: x, input_shape=model_input.shape[1:])(model_input)
 
@@ -69,7 +69,6 @@ def get_generator():
     model = Dense(1024, activation='relu')(model)
 
     # Change above here
-    wavegan_instance = get_wavegan()
     model = wavegan_instance(model)
 
     return Model(inputs=model_input, outputs=(model, input_copied))
@@ -299,7 +298,8 @@ def train(epochs):
     X_train_video = X_train_video[shuffled_indices]
 
     discriminator = get_discriminator()
-    generator = get_generator()
+    wavegan_instance = get_wavegan()
+    generator = get_generator(wavegan_instance)
 
     generator_model = make_generator_model(generator, discriminator)
     generator.summary()
