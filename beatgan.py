@@ -45,7 +45,7 @@ class HyperParameters():
         self.num_frames = num_frames
         self.video_shape = (num_frames, 2*window_radius, 2*window_radius, 3) # (5, 50, 50, 3)
 
-hp = HyperParameters(1, 5, 5, 100, 25, 10)
+hp = HyperParameters(1, 1, 5, 100, 25, 10)
 
 
 def get_generator(wavegan_instance):
@@ -95,18 +95,24 @@ def get_wavegan():
 
 def get_discriminator():
     audio_model_input = Input(shape=(16384, hp.c))
-    audio_model = Conv1D(hp.d, 25, strides=4, padding="same", input_shape=(16384, hp.c), kernel_regularizer=l2(regularization_penalty))(audio_model_input)
-    audio_model = LeakyReLU(alpha=0.2)(audio_model)
-    audio_model = Conv1D(2*hp.d, 25, strides=4, padding="same", kernel_regularizer=l2(regularization_penalty))(audio_model)
-    audio_model = LeakyReLU(alpha=0.2)(audio_model)
-    audio_model = Conv1D(4*hp.d, 25, strides=4, padding="same", kernel_regularizer=l2(regularization_penalty))(audio_model)
-    audio_model = LeakyReLU(alpha=0.2)(audio_model)
-    audio_model = Conv1D(8*hp.d, 25, strides=4, padding="same", kernel_regularizer=l2(regularization_penalty))(audio_model)
-    audio_model = LeakyReLU(alpha=0.2)(audio_model)
-    audio_model = Conv1D(16*hp.d, 25, strides=4, padding="same", kernel_regularizer=l2(regularization_penalty))(audio_model)
-    audio_model = LeakyReLU(alpha=0.2)(audio_model)
-    audio_model = Reshape((256*hp.d, ), input_shape = (1, 16, 16*hp.d))(audio_model)
+    audio_model = get_audio_discriminator()(audio_model_input)
 
+    video_model_input = Input(shape=(hp.video_shape))
+    video_model = get_video_discriminator()(video_model_input)
+    # Change above here
+
+    final_model = Concatenate()([audio_model, video_model])
+    # Change below here
+    final_model = Dense(256, kernel_regularizer=l2(regularization_penalty))(final_model)
+    final_model = Dense(256, kernel_regularizer=l2(regularization_penalty))(final_model)
+    final_model = Dense(128, kernel_regularizer=l2(regularization_penalty))(final_model)
+    final_model = Dense(64, kernel_regularizer=l2(regularization_penalty))(final_model)
+    # Change above here
+    final_model = Dense(1)(final_model)
+
+    return Model(inputs=[audio_model_input, video_model_input], outputs=final_model)
+
+def get_video_discriminator():
     video_model_input = Input(shape=(hp.video_shape))
     # Change below here
     video_model = Conv3D(filters=16, kernel_size=3, strides=1, padding='valid', data_format='channels_last', kernel_regularizer=l2(regularization_penalty))(video_model_input)
@@ -123,18 +129,24 @@ def get_discriminator():
     video_model = MaxPooling3D(pool_size=(2, 2, 2), strides=1, padding='valid', data_format='channels_last')(video_model)
     video_model = Flatten()(video_model)
     video_model = Dense(1024, activation='relu')(video_model)
-    # Change above here
 
-    final_model = Concatenate()([audio_model, video_model])
-    # Change below here
-    final_model = Dense(256, kernel_regularizer=l2(regularization_penalty))(final_model)
-    final_model = Dense(256, kernel_regularizer=l2(regularization_penalty))(final_model)
-    final_model = Dense(128, kernel_regularizer=l2(regularization_penalty))(final_model)
-    final_model = Dense(64, kernel_regularizer=l2(regularization_penalty))(final_model)
-    # Change above here
-    final_model = Dense(1)(final_model)
+    return Model(inputs=video_model_input, outputs=video_model)
 
-    return Model(inputs=[audio_model_input, video_model_input], outputs=final_model)
+def get_audio_discriminator():
+    audio_model_input = Input(shape=(16384, hp.c))
+    audio_model = Conv1D(hp.d, 25, strides=4, padding="same", input_shape=(16384, hp.c), kernel_regularizer=l2(regularization_penalty))(audio_model_input)
+    audio_model = LeakyReLU(alpha=0.2)(audio_model)
+    audio_model = Conv1D(2*hp.d, 25, strides=4, padding="same", kernel_regularizer=l2(regularization_penalty))(audio_model)
+    audio_model = LeakyReLU(alpha=0.2)(audio_model)
+    audio_model = Conv1D(4*hp.d, 25, strides=4, padding="same", kernel_regularizer=l2(regularization_penalty))(audio_model)
+    audio_model = LeakyReLU(alpha=0.2)(audio_model)
+    audio_model = Conv1D(8*hp.d, 25, strides=4, padding="same", kernel_regularizer=l2(regularization_penalty))(audio_model)
+    audio_model = LeakyReLU(alpha=0.2)(audio_model)
+    audio_model = Conv1D(16*hp.d, 25, strides=4, padding="same", kernel_regularizer=l2(regularization_penalty))(audio_model)
+    audio_model = LeakyReLU(alpha=0.2)(audio_model)
+    audio_model = Reshape((256*hp.d, ), input_shape = (1, 16, 16*hp.d))(audio_model)
+
+    return Model(inputs=audio_model_input, outputs=audio_model)
 
 def generator_containing_discriminator(generator, discriminator):
     model = Input(shape=(hp.video_shape))
