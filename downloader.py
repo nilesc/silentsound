@@ -62,13 +62,20 @@ def download_file(filename, prefix, num_videos=None):
         print(e)
 
     num_downloaded = 0
+    available_files = set(os.listdir('{}_videos'.format(prefix)))
 
     with open(filename) as csv_file:
+        # Format of csv files is: YouTube ID, start segment, end segment, X coordinate, Y coordinate
         csv_reader = csv.reader(csv_file, delimiter=',')
-        for row in csv_reader:
+        for i, row in enumerate(csv_reader):
             video_id = row[0]
-            end_time = string_to_int(row[1])
-            start_time = end_time - 1
+            filename_mp4 = f'{prefix}_videos/{video_id}.mp4'
+            if filename_mp4 in available_files: # skip if video already downloaded
+                continue
+            available_files.add(filename_mp4)
+
+            start_time = (string_to_int(row[1]) + string_to_int(row[2]))//2
+            end_time = start_time + 1
 
             url = 'http://youtube.com/watch?v={}'.format(video_id)
 
@@ -90,27 +97,27 @@ def download_file(filename, prefix, num_videos=None):
 
             itag = filtered.first().itag
             filename = '{}.mp4'.format(video_id)
-            filename_mp4 = '{}.mp4'.format(video_id)
-            original_video_location = f'videos/{filename}'
-            keyframe_video_location = f'videos/key-{filename}'
+            original_video_location = f'{prefix}_videos/{filename}'
+            keyframe_video_location = f'{prefix}_videos/key-{filename}'
             download_video(url, itag, filename=original_video_location)
 
             start_min = start_time//60
             start_sec = start_time%60
-            subprocess.call(f'ffmpeg -i {original_video_location} -force_key_frames 00:{start_min}:{start_sec} {keyframe_video_location}', shell=True)
-            ffmpeg_extract_subclip(keyframe_video_location,
-                    start_time,
-                    end_time,
-                    targetname='{}_videos/{}'.format(prefix, filename_mp4))
+            subprocess.call(f'ffmpeg -y -i {original_video_location} -force_key_frames 00:{start_min}:{start_sec} {keyframe_video_location}', shell=True)
+            #ffmpeg_extract_subclip(keyframe_video_location,
+            #        start_time,
+            #        end_time,
+            #        targetname=filename_mp4)
+
+            subprocess.call(f'ffmpeg -y -ss {start_time} -i {keyframe_video_location} -t 1 -vcodec copy -acodec copy -y {filename_mp4}', shell=True)
 
             extract_audio(prefix, video_id)
 
-            os.remove(original_video_location)
+            #os.remove(original_video_location)
             os.remove(keyframe_video_location)
 
             if num_videos and num_downloaded == num_videos:
                 break
-
 
 if __name__ == '__main__':
     if len(sys.argv) != 4:
