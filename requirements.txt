@@ -46,7 +46,7 @@ pydot==1.4.0
 Pygments==2.2.0
 pyparsing==2.3.0
 pytube==9.3.5
-PyYAML==5.1
+PyYAML==5.4
 regex==2017.11.9
 requests==2.20.1
 resampy==0.2.1
